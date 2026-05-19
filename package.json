@@ -1,0 +1,46 @@
+{
+  "name": "sf-agentpmd",
+  "version": "0.1.0",
+  "description": "SF CLI plugin: McCabe cyclomatic complexity and Agent LOC analysis for AgentScript (.agent) bundles.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "files": [
+    "/lib",
+    "/messages",
+    "/oclif.manifest.json"
+  ],
+  "bin": {
+    "sf-agentpmd": "./bin/run.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rm -rf lib oclif.manifest.json tsconfig.tsbuildinfo",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@agentscript/parser-javascript": "file:./vendor/agentscript-parser-javascript",
+    "@agentscript/types": "file:./vendor/agentscript-types",
+    "@oclif/core": "^4",
+    "@salesforce/sf-plugins-core": "^11"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.6",
+    "vitest": "^2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "oclif": {
+    "bin": "sf",
+    "commands": "./lib/commands",
+    "topicSeparator": " ",
+    "topics": {
+      "agentpmd": {
+        "description": "Static analysis for Agentforce / AgentScript bundles (CC and LOC)."
+      }
+    }
+  }
+}

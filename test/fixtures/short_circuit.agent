@@ -1,0 +1,25 @@
+system:
+    instructions: "Tiny test agent for CC operators."
+
+config:
+    developer_name: "ShortCircuitTest"
+
+start_agent root:
+    description: "verifies CC counts and/or operators"
+
+    before_reasoning:
+        if @variables.a == "x" and @variables.b == "y":
+            set @variables.flag = True
+        if @variables.c == "1" or @variables.d == "2" or @variables.e == "3":
+            set @variables.flag = False
+        if @variables.f == "z":
+            if @variables.g == "w":
+                set @variables.flag = True
+
+    reasoning:
+        instructions: ->
+            |  hello
+
+    after_reasoning:
+        if @variables.flag:
+            set @variables.done = True

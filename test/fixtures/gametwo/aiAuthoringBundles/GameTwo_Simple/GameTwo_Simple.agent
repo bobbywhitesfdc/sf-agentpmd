@@ -1,0 +1,148 @@
+# GameTwo_Simple — default-in posture, simplified conversation
+#
+# Same posture as GameTwo (reasoning owns rules, increments, narration;
+# only randomness is pushed to Apex). Different conversation design:
+# every player utterance is a round trigger. No half-duplex
+# "agent-picks-then-waits" intermediate state. Stats are part of the
+# standing greeting.
+#
+# ── Cumulative experiments and findings ──────────────────────────
+# Experiment 1: pickRandomChoice removed from LLM tool surface
+#   (deterministic phase still invokes via `run`). Result: did not
+#   fix the all-ties pattern. Kept — narrows the LLM action contract.
+#
+# Experiment 2: recordPlayerChoice swapped from @utils.setVariables
+#   to a typed Apex action (apex://GameTwo_RecordChoice). Result: did
+#   not fix the all-ties pattern. Kept for now; candidate for revert.
+#
+# Experiment 3: inner conditional cascade collapsed from 7 sequential
+#   `if` statements to 3 compound `if` statements with self-contained
+#   clears. Result: did not fix the all-ties pattern. Trace showed
+#   the loss-compound (logically TRUE for rock-vs-paper) did not fire.
+#
+# Experiment 4: adjudication ifs moved OUT of the outer `if` body
+#   to top-level sibling position. WORKED — confirmed correctness in
+#   10-round smoke (5W/3L/2T, every outcome matched Apex output).
+#   See: findings/agentscript-if-chain-fallthrough.md
+#
+# Experiment 5: recordPlayerChoice reverted from typed Apex back
+#   to @utils.setVariables. Experiment 2 falsified the LLM-multi-
+#   write hypothesis, so the typed action carried no benefit. The
+#   LLM goes back to handling r/p/s normalization itself.
+#
+# Experiment 6 (this version): operating-rules block trimmed from
+#   ~110 tokens to ~50. The load-bearing instructions (tool-call
+#   gate + anti-fabrication) are preserved; redundancy and the
+#   "anything else" case (which the standing prompt already handles)
+#   are removed.
+
+system:
+    instructions: "You are GameTwo_Simple, a host for rock-paper-scissors. Every player utterance is one full round. The system handles randomization, rules, and scoring; you only normalize player input and relay the system-produced result line verbatim."
+    messages:
+        welcome: "Stats: 0-0-0. Your throw — rock, paper, scissors (r/p/s also work), or q to quit?"
+        error: "Sorry, something went wrong. Let's try again."
+
+config:
+    developer_name: "GameTwo_Simple"
+    agent_label: "GameTwo (simplified default-in)"
+    description: "Single-topic, single-state RPS agent. Default-in posture with simplified conversation design."
+    agent_type: "AgentforceEmployeeAgent"
+
+model_config:
+    model: "model://sfdc_ai__DefaultBedrockAnthropicClaude45Opus"
+
+variables:
+    player_wins: mutable number = 0
+        description: "Cumulative player wins."
+    player_losses: mutable number = 0
+        description: "Cumulative player losses."
+    player_ties: mutable number = 0
+        description: "Cumulative player ties."
+    rng_cookie: mutable string = ""
+        description: "Opaque cache-busting cookie carried between pickRandomChoice calls."
+    player_choice: mutable string = ""
+        description: "Player's throw for the current round. Cleared after adjudication."
+    agent_choice: mutable string = ""
+        description: "Agent's throw for the current round. Cleared after adjudication."
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+start_agent play:
+    label: "Play"
+    description: "Single-state RPS handler. Every player utterance triggers one round; quit on q."
+
+    reasoning:
+        instructions: ->
+            # FLAT STRUCTURE: each conditional is a sibling at the
+            # top level of instructions, NOT nested. Each adjudication
+            # if self-gates on `player_choice != ""` so it only fires
+            # after recordPlayerChoice has set the variable.
+
+            # Step 1: pick the agent's throw when the player has chosen.
+            if @variables.player_choice != "":
+                run @actions.pickRandomChoice
+                    with cacheBuster = @variables.rng_cookie
+                    set @variables.agent_choice = @outputs.choice
+                    set @variables.rng_cookie = @outputs.nextCacheBuster
+
+            # Step 2: tie branch.
+            if @variables.player_choice != "" and @variables.player_choice == @variables.agent_choice:
+                set @variables.player_ties = @variables.player_ties + 1
+                | You picked {!@variables.player_choice}, I picked {!@variables.agent_choice}. Tie. Score: {!@variables.player_wins}-{!@variables.player_losses}-{!@variables.player_ties}. Your throw — r/p/s or q?
+                set @variables.player_choice = ""
+                set @variables.agent_choice = ""
+
+            # Step 3: win branch (player wins).
+            if @variables.player_choice != "" and ((@variables.player_choice == "rock" and @variables.agent_choice == "scissors") or (@variables.player_choice == "scissors" and @variables.agent_choice == "paper") or (@variables.player_choice == "paper" and @variables.agent_choice == "rock")):
+                set @variables.player_wins = @variables.player_wins + 1
+                | You picked {!@variables.player_choice}, I picked {!@variables.agent_choice}. You win. Score: {!@variables.player_wins}-{!@variables.player_losses}-{!@variables.player_ties}. Your throw — r/p/s or q?
+                set @variables.player_choice = ""
+                set @variables.agent_choice = ""
+
+            # Step 4: loss branch.
+            if @variables.player_choice != "" and ((@variables.player_choice == "rock" and @variables.agent_choice == "paper") or (@variables.player_choice == "paper" and @variables.agent_choice == "scissors") or (@variables.player_choice == "scissors" and @variables.agent_choice == "rock")):
+                set @variables.player_losses = @variables.player_losses + 1
+                | You picked {!@variables.player_choice}, I picked {!@variables.agent_choice}. You lose. Score: {!@variables.player_wins}-{!@variables.player_losses}-{!@variables.player_ties}. Your throw — r/p/s or q?
+                set @variables.player_choice = ""
+                set @variables.agent_choice = ""
+
+            # Step 5: standing prompt when no round is in progress.
+            if @variables.player_choice == "":
+                | Stats: {!@variables.player_wins}-{!@variables.player_losses}-{!@variables.player_ties}. Your throw — rock, paper, scissors (r/p/s) or q to quit?
+
+            | Call recordPlayerChoice ONLY when the user provides an unambiguous, committed
+              throw — exactly one of rock, paper, or scissors (or r, p, s shorthand, any case).
+              Synonyms (stone, shears, lizard, spock, plurals like "rocks") and hedged inputs
+              (maybe X, I guess X, X or Y) are NOT valid throws; ask the user for one of the
+              three exact words. On q or quit: report final stats without calling the tool.
+              Never fabricate a round result; relay only text the system has emitted above.
+
+        actions:
+            recordPlayerChoice: @utils.setVariables
+                description: "Record the player's normalized throw (rock, paper, or scissors)."
+                with player_choice = ...
+
+    actions:
+        pickRandomChoice:
+            description: "Returns a uniformly random rock/paper/scissors choice from Apex, plus a fresh cache-buster cookie. Invoked by the deterministic phase only."
+            label: "Pick random RPS choice"
+            target: "apex://GameTwo_RandomChoice"
+            inputs:
+                cacheBuster: string
+                    description: "Opaque cookie from the previous call. Empty on first invocation."
+                    label: "Cache Buster"
+                    is_required: False
+            outputs:
+                choice: string
+                    label: "Choice"
+                    description: "The randomly selected throw."
+                    is_displayable: False
+                    filter_from_agent: False
+                nextCacheBuster: string
+                    label: "Next Cache Buster"
+                    description: "Fresh cookie to pass on the next call."
+                    is_displayable: False
+                    filter_from_agent: False

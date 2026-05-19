@@ -1,0 +1,136 @@
+# GameTwo_Out_Simple — default-out posture, simplified conversation
+#
+# Same posture as GameTwo_Out (Apex action owns randomness, rules,
+# outcome classification, and score mutation; reasoning only normalizes
+# input and relays structured outputs). Different conversation design:
+# every player utterance is one full round trigger. No half-duplex
+# "agent-picks-then-waits" intermediate state.
+#
+# Apex action GameTwo_PlayRound is reused, with an added playerChoice
+# output that echoes the normalized input so the result line can
+# include both throws without a second tool call.
+
+system:
+    instructions: "You are GameTwo_Out_Simple, a host for rock-paper-scissors. Every player utterance is one full round. The Apex action handles randomization, rules, and scoring; you only normalize player input and relay the system-produced result line verbatim."
+    messages:
+        welcome: "Stats: 0-0-0. Your throw — rock, paper, scissors (r/p/s also work), or q to quit?"
+        error: "Sorry, something went wrong. Let's try again."
+
+config:
+    developer_name: "GameTwo_Out_Simple"
+    agent_label: "GameTwo (simplified default-out)"
+    description: "Single-topic, single-state RPS agent. Default-out posture with simplified conversation design."
+    agent_type: "AgentforceEmployeeAgent"
+
+model_config:
+    model: "model://sfdc_ai__DefaultBedrockAnthropicClaude45Opus"
+
+variables:
+    player_wins: mutable string = "0"
+        description: "Cumulative player wins (string for action I/O compatibility)."
+    player_losses: mutable string = "0"
+        description: "Cumulative player losses (string for action I/O compatibility)."
+    player_ties: mutable string = "0"
+        description: "Cumulative player ties (string for action I/O compatibility)."
+    last_player_choice: mutable string = ""
+        description: "Player throw from the most recently completed round."
+    last_agent_choice: mutable string = ""
+        description: "Agent throw from the most recently completed round."
+    last_outcome: mutable string = ""
+        description: "Outcome of the most recent round: win, loss, or tie. Empty before any round."
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+start_agent play:
+    label: "Play"
+    description: "Single-state RPS handler. Every player utterance triggers one round; quit on q."
+
+    reasoning:
+        instructions: ->
+            # If a round just finished, surface its result. Then clear so the
+            # next user turn starts fresh.
+            if @variables.last_outcome != "":
+                | You picked {!@variables.last_player_choice}, I picked {!@variables.last_agent_choice}. You {!@variables.last_outcome}. Score: {!@variables.player_wins}-{!@variables.player_losses}-{!@variables.player_ties}. Your throw — r/p/s or q?
+                set @variables.last_outcome = ""
+                set @variables.last_player_choice = ""
+                set @variables.last_agent_choice = ""
+            else:
+                | Stats: {!@variables.player_wins}-{!@variables.player_losses}-{!@variables.player_ties}. Your throw — rock, paper, scissors (r/p/s) or q to quit?
+
+            | Call playRound ONLY when the user provides an unambiguous, committed
+              throw — exactly one of rock, paper, or scissors (or r, p, s shorthand, any case).
+              Synonyms (stone, shears, lizard, spock, plurals like "rocks") and hedged inputs
+              (maybe X, I guess X, X or Y) are NOT valid throws; ask the user for one of the
+              three exact words. On q or quit: report final stats without calling the tool.
+              Never fabricate a round result; relay only text the system has emitted above.
+
+        actions:
+            playRound: @actions.playRound
+                description: "Play one round. Apex picks the agent throw, applies rules, returns updated scores."
+                with playerChoice = ...
+                with currentWins = @variables.player_wins
+                with currentLosses = @variables.player_losses
+                with currentTies = @variables.player_ties
+                set @variables.last_player_choice = @outputs.playerChoice
+                set @variables.last_agent_choice = @outputs.agentChoice
+                set @variables.last_outcome = @outputs.outcome
+                set @variables.player_wins = @outputs.newWins
+                set @variables.player_losses = @outputs.newLosses
+                set @variables.player_ties = @outputs.newTies
+
+    actions:
+        playRound:
+            description: "Play one round of rock-paper-scissors. Apex picks the agent throw at random, classifies the outcome, and returns updated counts."
+            label: "Play RPS round"
+            target: "apex://GameTwo_PlayRound"
+            inputs:
+                playerChoice: string
+                    description: "Normalized player throw: rock, paper, or scissors."
+                    label: "Player Choice"
+                    is_required: True
+                currentWins: string
+                    description: "Player win count before this round, as a string integer."
+                    label: "Current Wins"
+                    is_required: True
+                currentLosses: string
+                    description: "Player loss count before this round, as a string integer."
+                    label: "Current Losses"
+                    is_required: True
+                currentTies: string
+                    description: "Player tie count before this round, as a string integer."
+                    label: "Current Ties"
+                    is_required: True
+            outputs:
+                playerChoice: string
+                    description: "Echo of the normalized player throw."
+                    label: "Player Choice (echo)"
+                    is_displayable: True
+                    filter_from_agent: False
+                agentChoice: string
+                    description: "The agent throw for this round."
+                    label: "Agent Choice"
+                    is_displayable: True
+                    filter_from_agent: False
+                outcome: string
+                    description: "Round outcome from the player perspective: win, loss, or tie."
+                    label: "Outcome"
+                    is_displayable: True
+                    filter_from_agent: False
+                newWins: string
+                    description: "Updated player win count, as a string integer."
+                    label: "New Wins"
+                    is_displayable: True
+                    filter_from_agent: False
+                newLosses: string
+                    description: "Updated player loss count, as a string integer."
+                    label: "New Losses"
+                    is_displayable: True
+                    filter_from_agent: False
+                newTies: string
+                    description: "Updated player tie count, as a string integer."
+                    label: "New Ties"
+                    is_displayable: True
+                    filter_from_agent: False

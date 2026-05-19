@@ -28,10 +28,18 @@ export interface ActionDeclaration {
   location: SourceLocation;
 }
 
+export type ActionReferenceContext =
+  | 'reasoning_actions'
+  | 'reasoning_instructions_run'
+  | 'after_reasoning_run'
+  | 'before_reasoning_run'
+  | 'transition'
+  | 'unknown';
+
 export interface ActionReference {
   name: string;
   scope: string;
-  context: 'reasoning_actions' | 'after_reasoning_run' | 'before_reasoning_run' | 'transition' | 'unknown';
+  context: ActionReferenceContext;
   location: SourceLocation;
 }
 

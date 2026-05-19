@@ -108,7 +108,15 @@ export function collectReferences(scope: AgentScope): ActionReference[] {
   explore(findMappingEntry(scope.body, 'before_reasoning'), 'before_reasoning_run');
   explore(findMappingEntry(scope.body, 'after_reasoning'), 'after_reasoning_run');
   const reasoning = findMappingEntry(scope.body, 'reasoning');
-  if (reasoning) explore(findMappingEntry(reasoning, 'actions'), 'reasoning_actions');
+  if (reasoning) {
+    // `reasoning.actions:` — the declarative action contract block;
+    // refs here describe what the LLM is allowed to call.
+    explore(findMappingEntry(reasoning, 'actions'), 'reasoning_actions');
+    // `reasoning.instructions: ->` — refs here are `run @actions.X`
+    // invocations the LLM evaluates as part of its instructions.
+    // Per the whitepaper, these execute non-deterministically.
+    explore(findMappingEntry(reasoning, 'instructions'), 'reasoning_instructions_run');
+  }
 
   return refs;
 }

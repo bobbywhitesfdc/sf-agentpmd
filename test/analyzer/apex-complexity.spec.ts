@@ -50,6 +50,21 @@ describe('Apex McCabe CC walker', () => {
     expect(ccs.parseCount).toBe(3);
   });
 
+  it('renders formal parameter signatures with whitespace between type and id', () => {
+    // ANTLR getText() concatenates tokens with no whitespace, which previously
+    // produced `List<Request>requests` instead of `List<Request> requests`.
+    const cu = parseApexSource(
+      readFileSync(fixture('classes/GameTwo_PlayRound.cls'), 'utf8'),
+    );
+    const methods = methodsInCompilationUnit(cu).map(complexityOfMethod);
+    const execute = methods.find(m => m.name === 'execute')!;
+    expect(execute.signature).toBe('List<Result> execute(List<Request> requests)');
+    const playOne = methods.find(m => m.name === 'playOne')!;
+    expect(playOne.signature).toBe('Result playOne(Request req)');
+    const parseCount = methods.find(m => m.name === 'parseCount')!;
+    expect(parseCount.signature).toBe('Integer parseCount(String s)');
+  });
+
   it('skips when-else arms and does not count else/finally/try', () => {
     const source = `
       public class WhenTest {

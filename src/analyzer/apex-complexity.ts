@@ -11,6 +11,7 @@ import {
   LogAndExpressionContext,
   LogOrExpressionContext,
   type CompilationUnitContext,
+  type FormalParametersContext,
 } from '@apexdevtools/apex-parser';
 import type { ParserRuleContext } from 'antlr4';
 import type {
@@ -118,13 +119,30 @@ function renderSignature(
   ctx: MethodDeclarationContext | ConstructorDeclarationContext,
   name: string,
 ): string {
-  const params = ctx.formalParameters();
-  const paramsText = params ? params.getText() : '()';
+  const paramsText = renderFormalParameters(ctx.formalParameters());
   if (ctx instanceof MethodDeclarationContext) {
     const retType = ctx.typeRef()?.getText() ?? (ctx.VOID() ? 'void' : '');
     return `${retType ? retType + ' ' : ''}${name}${paramsText}`;
   }
   return `${name}${paramsText}`;
+}
+
+/**
+ * ANTLR's `getText()` concatenates child tokens with no whitespace, which
+ * mangles parameter lists like `List<Request> requests` into
+ * `List<Request>requests`. Walk the structured children and rebuild a
+ * properly-spaced signature.
+ */
+function renderFormalParameters(params: FormalParametersContext | null): string {
+  if (!params) return '()';
+  const list = params.formalParameterList();
+  if (!list) return '()';
+  const parts = list.formalParameter_list().map(p => {
+    const type = p.typeRef()?.getText() ?? '';
+    const id = p.id()?.getText() ?? '';
+    return type && id ? `${type} ${id}` : type || id;
+  });
+  return `(${parts.join(', ')})`;
 }
 
 /**

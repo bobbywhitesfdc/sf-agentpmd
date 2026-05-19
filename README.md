@@ -59,8 +59,23 @@ applied to the AgentScript surface that those tools don't cover today.
 | --- | --- |
 | `-d, --source-dir <path>` | Directory or single `.agent` file. Required. |
 | `--apex-source <path>` | Override directory for resolving `apex://` targets. Default: walk up from each `.agent` looking for a `classes/` sibling. |
+| `--format <fmt>` | Non-JSON output format: `text` (default), `markdown`, `sarif`, `csv`. Ignored when `--json` is set. |
+| `--width <N>` | Rule width for the text renderer. Default 60. |
+| `--ascii` | Force ASCII-only output in the text renderer (no emoji / box chars). Auto-enabled on non-TTY stdout. |
+| `--no-color` | Disable ANSI color. `NO_COLOR` env var also disables. |
+| `--sarif-warning <N>` / `--sarif-error <N>` | Override the SARIF level thresholds. Defaults 10 / 20. |
 | `--fail-on <N>` | Exit non-zero (code 2) if **combined** (agent + Apex) CC ≥ N. Useful in CI. |
-| `--json` | Machine-readable report on stdout. |
+| `--json` | Machine-readable SF CLI envelope on stdout. Takes precedence over `--format`. |
+
+### Output formats at a glance
+
+| Format | When to use | Surface |
+| --- | --- | --- |
+| `text` (default) | Terminal eyeballs. | Color-coded, palette-aligned (red/yellow/green/gray by CC band). Auto-degrades to ASCII on non-TTY. |
+| `markdown` | PR descriptions, gists, whitepaper appendices. | Mermaid `xychart-beta` bar chart at top (AgentScript red vs Apex green) + per-bundle and per-class tables. |
+| `sarif` | GitHub Code Scanning / IDE annotations / CI. | SARIF 2.1.0 with one result per procedure / per method. Level driven by complexity thresholds. |
+| `csv` | Spreadsheet pivots, posture-comparison matrices. | One row per procedure or Apex method. RFC-4180 quoted. |
+| `--json` | Machine consumers (e.g. another sf plugin). | SF CLI envelope around the full `AnalysisReport`. |
 
 ### Example
 

@@ -40,20 +40,23 @@ is a timing call.
       cyclomatic-complexity, pmd, static-analysis, …)
 
 ### 3. Fix the `files` whitelist — **the real blocker**
-Current state:
+Current state (partial; `/.claude/skills` was added when the skill
+landed):
 ```json
-"files": ["/lib", "/messages", "/oclif.manifest.json"]
+"files": ["/lib", "/messages", "/oclif.manifest.json", "/.claude/skills"]
 ```
-This silently omits `bin/` (so the `"bin": "./bin/run.js"` entry points
-nowhere) and `vendor/` (so `file:./vendor/agentscript-*` deps resolve to
-empty dirs). Published as-is the plugin installs but does not run.
+This still silently omits `bin/` (so the `"bin": "./bin/run.js"` entry
+points nowhere) and `vendor/` (so `file:./vendor/agentscript-*` deps
+resolve to empty dirs). Published as-is the plugin installs but does
+not run.
 
 Needs to be:
 ```json
-"files": ["/lib", "/bin", "/vendor", "/messages", "/oclif.manifest.json", "/LICENSE", "/NOTICE"]
+"files": ["/lib", "/bin", "/vendor", "/messages", "/oclif.manifest.json", "/.claude/skills", "/LICENSE", "/NOTICE"]
 ```
 - [ ] Add `/bin`, `/vendor`, `/LICENSE`, `/NOTICE` to `files`.
-- [ ] Verify via `npm pack --dry-run` that all expected entries appear.
+- [ ] Verify via `npm pack --dry-run` that all expected entries appear
+      — including the `.claude/skills/agentforcepmd/` tree.
 
 ### 4. Apache-2.0 attribution for vendored AgentScript
 - [ ] Add `LICENSE` (copy from upstream `agentscript/LICENSE.txt`).

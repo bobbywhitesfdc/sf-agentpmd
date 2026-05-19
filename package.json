@@ -8,7 +8,8 @@
   "files": [
     "/lib",
     "/messages",
-    "/oclif.manifest.json"
+    "/oclif.manifest.json",
+    "/.claude/skills"
   ],
   "bin": {
     "sf-agentpmd": "./bin/run.js"

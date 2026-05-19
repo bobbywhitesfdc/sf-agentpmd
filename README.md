@@ -62,6 +62,7 @@ Run it from anywhere inside an sfdx project and it just works.
 | Flag | Purpose |
 | --- | --- |
 | `-d, --source-dir <path>` | Directory or single `.agent` file. Optional. Defaults to the `packageDirectories` of the nearest `sfdx-project.json`. |
+| `-n, --api-name <X>` | Filter to a specific bundle. Matches the bundle directory name **or** `config.developer_name:` inside the `.agent`. Repeat for multiple bundles. |
 | `--apex-source <path>` | Override directory for resolving `apex://` targets. Default: walk up from each `.agent` looking for a `classes/` sibling. |
 | `--format <fmt>` | Non-JSON output format: `text` (default), `markdown`, `sarif`, `csv`. Ignored when `--json` is set. |
 | `--width <N>` | Rule width for the text renderer. Default 60. |

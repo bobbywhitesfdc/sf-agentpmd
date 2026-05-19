@@ -101,6 +101,30 @@ export function bodyOf(scopeKey: SyntaxNode): SyntaxNode | undefined {
   return mappingValue(parent);
 }
 
+/**
+ * Read the `developer_name:` value from the `config:` block of a parsed
+ * .agent file. This is the canonical API name of the agent (matches what
+ * `sf agent generate authoring-bundle --api-name X` produces). Returns
+ * undefined when the field is absent or empty.
+ */
+export function extractDeveloperName(root: SyntaxNode): string | undefined {
+  const topMapping = root.namedChildren.find(c => c.type === 'mapping') ?? root;
+  for (const c of topMapping.namedChildren) {
+    if (c.type !== 'mapping_element') continue;
+    const keyNode =
+      c.childForFieldName('key') ?? c.namedChildren.find(n => n.type === 'key');
+    if (!keyNode) continue;
+    const h = keyHeader(keyNode);
+    if (!h || h.kind !== 'config') continue;
+    const body = mappingValue(c);
+    if (!body) return undefined;
+    const devNameVal = findMappingEntry(body, 'developer_name');
+    if (!devNameVal) return undefined;
+    return extractStringLiteral(devNameVal);
+  }
+  return undefined;
+}
+
 /** Convenience: extract a leaf string literal text (without surrounding quotes). */
 export function extractStringLiteral(n: SyntaxNode): string | undefined {
   for (const d of descendants(n)) {

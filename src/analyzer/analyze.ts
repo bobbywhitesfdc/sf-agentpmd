@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { readdir, stat } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import type {
   ActionDeclaration,
   ActionReference,
@@ -9,7 +9,7 @@ import type {
   FileReport,
   ProcedureCC,
 } from './types.js';
-import { parseAgentSource } from './parse.js';
+import { extractDeveloperName, parseAgentSource } from './parse.js';
 import { collectScopes, complexityForFile } from './complexity.js';
 import { collectDeclarations, collectReferences } from './action-references.js';
 import { analyzeReferencedApex } from './apex-analyze.js';
@@ -22,6 +22,44 @@ export interface AnalyzeOptions {
    * root (or, when multiple roots are supplied, the longest common ancestor).
    */
   reportBase?: string;
+  /**
+   * Filter to specific agent bundles by API name. Each entry is matched
+   * against (a) the bundle directory name and (b) `config.developer_name`
+   * inside the .agent file. When omitted or empty, all discovered bundles
+   * are analyzed.
+   */
+  apiNames?: string[];
+}
+
+/** Error thrown when --api-name filters produce no matches. Carries the
+ * candidate list so callers can show a useful hint. */
+export class NoMatchingBundlesError extends Error {
+  constructor(
+    public readonly requested: string[],
+    public readonly available: BundleIdentity[],
+  ) {
+    super(
+      `No agent bundle matched ${requested.map(n => `'${n}'`).join(', ')}. ` +
+        `Available: ${available.map(formatBundleIdentity).join(', ')}`,
+    );
+    this.name = 'NoMatchingBundlesError';
+  }
+}
+
+export interface BundleIdentity {
+  /** Absolute path of the .agent file. */
+  path: string;
+  /** The bundle's directory name (parent of the .agent file). */
+  dirName: string;
+  /** The config.developer_name value, if present. */
+  developerName: string | undefined;
+}
+
+function formatBundleIdentity(b: BundleIdentity): string {
+  if (b.developerName && b.developerName !== b.dirName) {
+    return `${b.developerName} (dir: ${b.dirName})`;
+  }
+  return b.dirName;
 }
 
 /**
@@ -55,8 +93,10 @@ export async function analyzeSource(
   }
   allFiles.sort();
 
+  const filteredFiles = await filterByApiNames(allFiles, options.apiNames);
+
   const fileReports: FileReport[] = [];
-  for (const file of allFiles) {
+  for (const file of filteredFiles) {
     fileReports.push(await analyzeFile(file, reportBase));
   }
 
@@ -64,7 +104,7 @@ export async function analyzeSource(
     fileReports,
     sourceDirRoot: reportBase,
     apexSourceOverride: options.apexSourceOverride,
-    agentAbsPaths: allFiles,
+    agentAbsPaths: filteredFiles,
   });
 
   const report: AnalysisReport = {
@@ -136,6 +176,79 @@ function tallyTargets(files: FileReport[]): Record<ActionTargetKind, number> {
   };
   for (const f of files) for (const d of f.declarations) acc[d.targetKind]++;
   return acc;
+}
+
+/**
+ * Filter the discovered .agent file list by the supplied `--api-name`
+ * values. A bundle matches if (a) its directory name equals a requested
+ * name, or (b) its `config.developer_name` equals one. Bundles whose dir
+ * name already matches are kept without parsing; only the remainder are
+ * parsed for `developer_name` resolution.
+ *
+ * Throws NoMatchingBundlesError when filters were supplied but nothing
+ * matched, so callers can show the available list.
+ */
+async function filterByApiNames(
+  files: string[],
+  apiNames: string[] | undefined,
+): Promise<string[]> {
+  if (!apiNames || apiNames.length === 0) return files;
+  const wanted = new Set(apiNames);
+
+  const matches: string[] = [];
+  const unmatched: string[] = [];
+  for (const file of files) {
+    const dirName = basename(dirname(file));
+    if (wanted.has(dirName)) {
+      matches.push(file);
+    } else {
+      unmatched.push(file);
+    }
+  }
+
+  if (matches.length === files.length || unmatched.length === 0) {
+    return matches;
+  }
+
+  // Slow path: parse the still-unmatched files to read developer_name.
+  const identities: BundleIdentity[] = [];
+  for (const file of unmatched) {
+    const dirName = basename(dirname(file));
+    const developerName = await readDeveloperName(file);
+    identities.push({ path: file, dirName, developerName });
+    if (developerName && wanted.has(developerName)) {
+      matches.push(file);
+    }
+  }
+
+  if (matches.length === 0) {
+    // Build the full candidate list (matched dirs + parsed unmatched) for
+    // the error message.
+    const all: BundleIdentity[] = [];
+    for (const file of files) {
+      const existing = identities.find(i => i.path === file);
+      if (existing) {
+        all.push(existing);
+      } else {
+        all.push({
+          path: file,
+          dirName: basename(dirname(file)),
+          developerName: await readDeveloperName(file),
+        });
+      }
+    }
+    all.sort((a, b) => a.dirName.localeCompare(b.dirName));
+    throw new NoMatchingBundlesError(apiNames, all);
+  }
+
+  matches.sort();
+  return matches;
+}
+
+async function readDeveloperName(file: string): Promise<string | undefined> {
+  const source = await readFile(file, 'utf8');
+  const root = parseAgentSource(source);
+  return extractDeveloperName(root);
 }
 
 function longestCommonAncestor(paths: string[]): string {

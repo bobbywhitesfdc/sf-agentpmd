@@ -39,6 +39,12 @@ or spreadsheet pivots.`;
       summary:
         'Override directory to look up apex:// targets. By default we walk up from each .agent file looking for a sibling classes/ folder.',
     }),
+    'api-name': Flags.string({
+      char: 'n',
+      summary:
+        'Filter to specific agent bundles. Matched against the bundle directory name and the config.developer_name field. Repeatable.',
+      multiple: true,
+    }),
     format: Flags.string({
       summary:
         'Non-JSON output format. --json takes precedence per SF CLI convention.',
@@ -87,6 +93,7 @@ or spreadsheet pivots.`;
     const report = await analyzeSource(roots, {
       apexSourceOverride: flags['apex-source'],
       reportBase,
+      apiNames: flags['api-name'],
     });
 
     if (!this.jsonEnabled()) {

@@ -17,25 +17,54 @@ import { analyzeReferencedApex } from './apex-analyze.js';
 export interface AnalyzeOptions {
   /** Override location for apex:// resolution. Optional. */
   apexSourceOverride?: string;
+  /**
+   * Base directory for relative paths in the report. Defaults to the source
+   * root (or, when multiple roots are supplied, the longest common ancestor).
+   */
+  reportBase?: string;
 }
 
+/**
+ * Analyze AgentScript bundles under one or more source roots.
+ *
+ * Backward-compatible: pass a single path (string) for the legacy
+ * single-root case. Pass an array of paths for multi-root analysis
+ * (e.g. multiple `packageDirectories` in an sfdx project).
+ */
 export async function analyzeSource(
-  rootPath: string,
+  rootPathOrPaths: string | string[],
   options: AnalyzeOptions = {},
 ): Promise<AnalysisReport> {
-  const absRoot = resolve(rootPath);
-  const files = await findAgentFiles(absRoot);
+  const rawRoots = Array.isArray(rootPathOrPaths)
+    ? rootPathOrPaths
+    : [rootPathOrPaths];
+  if (rawRoots.length === 0) {
+    throw new Error('analyzeSource requires at least one source path');
+  }
+  const absRoots = rawRoots.map(p => resolve(p));
+  const reportBase = options.reportBase
+    ? resolve(options.reportBase)
+    : absRoots.length === 1
+      ? absRoots[0]
+      : longestCommonAncestor(absRoots);
+
+  const allFiles: string[] = [];
+  for (const root of absRoots) {
+    const files = await findAgentFiles(root);
+    for (const f of files) if (!allFiles.includes(f)) allFiles.push(f);
+  }
+  allFiles.sort();
 
   const fileReports: FileReport[] = [];
-  for (const file of files) {
-    fileReports.push(await analyzeFile(file, absRoot));
+  for (const file of allFiles) {
+    fileReports.push(await analyzeFile(file, reportBase));
   }
 
   const apex = await analyzeReferencedApex({
     fileReports,
-    sourceDirRoot: absRoot,
+    sourceDirRoot: reportBase,
     apexSourceOverride: options.apexSourceOverride,
-    agentAbsPaths: files,
+    agentAbsPaths: allFiles,
   });
 
   const report: AnalysisReport = {
@@ -107,4 +136,19 @@ function tallyTargets(files: FileReport[]): Record<ActionTargetKind, number> {
   };
   for (const f of files) for (const d of f.declarations) acc[d.targetKind]++;
   return acc;
+}
+
+function longestCommonAncestor(paths: string[]): string {
+  if (paths.length === 0) return process.cwd();
+  if (paths.length === 1) return paths[0];
+  const split = paths.map(p => p.split('/'));
+  const minLen = Math.min(...split.map(s => s.length));
+  const common: string[] = [];
+  for (let i = 0; i < minLen; i++) {
+    const seg = split[0][i];
+    if (split.every(s => s[i] === seg)) common.push(seg);
+    else break;
+  }
+  const joined = common.join('/') || '/';
+  return joined;
 }

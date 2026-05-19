@@ -10,9 +10,13 @@ applied to the AgentScript surface that those tools don't cover today.
 
 ## Current scope (v2)
 
-`sf agentpmd analyze --source-dir <dir|file> [--apex-source <dir>] [--fail-on N]`
+`sf agentpmd analyze [--source-dir <dir|file>] [--apex-source <dir>] [--fail-on N]`
 
-- Walks every `.agent` file under the given path.
+If `--source-dir` is omitted, the plugin walks up from cwd looking for
+`sfdx-project.json` and uses its `packageDirectories` as the source roots.
+Run it from anywhere inside an sfdx project and it just works.
+
+- Walks every `.agent` file under the resolved source roots.
 - For each `before_reasoning:`, `after_reasoning:`, and
   `reasoning.instructions:` block, computes McCabe CC:
 
@@ -57,7 +61,7 @@ applied to the AgentScript surface that those tools don't cover today.
 
 | Flag | Purpose |
 | --- | --- |
-| `-d, --source-dir <path>` | Directory or single `.agent` file. Required. |
+| `-d, --source-dir <path>` | Directory or single `.agent` file. Optional. Defaults to the `packageDirectories` of the nearest `sfdx-project.json`. |
 | `--apex-source <path>` | Override directory for resolving `apex://` targets. Default: walk up from each `.agent` looking for a `classes/` sibling. |
 | `--format <fmt>` | Non-JSON output format: `text` (default), `markdown`, `sarif`, `csv`. Ignored when `--json` is set. |
 | `--width <N>` | Rule width for the text renderer. Default 60. |

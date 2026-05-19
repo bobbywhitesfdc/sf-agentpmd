@@ -1,0 +1,9 @@
+{
+  "packageDirectories": [
+    { "path": "aiAuthoringBundles", "default": true },
+    { "path": "classes" }
+  ],
+  "name": "gametwo-fixture",
+  "namespace": "",
+  "sourceApiVersion": "66.0"
+}

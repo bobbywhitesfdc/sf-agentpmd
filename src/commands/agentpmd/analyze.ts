@@ -1,5 +1,6 @@
 import { SfCommand, Flags } from '@salesforce/sf-plugins-core';
 import { analyzeSource } from '../../analyzer/analyze.js';
+import { discoverSfdxProject } from '../../analyzer/project.js';
 import { render } from '../../renderers/index.js';
 import type { RenderFormat } from '../../renderers/index.js';
 import type { AnalysisReport } from '../../analyzer/types.js';
@@ -31,8 +32,8 @@ or spreadsheet pivots.`;
   public static readonly flags = {
     'source-dir': Flags.string({
       char: 'd',
-      summary: 'Directory or single .agent file to analyze.',
-      required: true,
+      summary:
+        'Directory or single .agent file to analyze. Defaults to the packageDirectories of the nearest sfdx-project.json.',
     }),
     'apex-source': Flags.string({
       summary:
@@ -75,8 +76,17 @@ or spreadsheet pivots.`;
 
   public async run(): Promise<AnalysisReport> {
     const { flags } = await this.parse(AgentpmdAnalyze);
-    const report = await analyzeSource(flags['source-dir'], {
+
+    const { roots, reportBase, sourceDescription } = await resolveSources(
+      flags['source-dir'],
+    );
+    if (!this.jsonEnabled() && sourceDescription) {
+      this.log(sourceDescription);
+    }
+
+    const report = await analyzeSource(roots, {
       apexSourceOverride: flags['apex-source'],
+      reportBase,
     });
 
     if (!this.jsonEnabled()) {
@@ -101,4 +111,43 @@ or spreadsheet pivots.`;
 
     return report;
   }
+}
+
+interface ResolvedSources {
+  roots: string[];
+  reportBase: string | undefined;
+  /** Optional human-readable note about where sources came from. */
+  sourceDescription?: string;
+}
+
+/**
+ * Resolve the directories we should scan. Explicit `--source-dir` wins.
+ * Otherwise, walk up from cwd looking for `sfdx-project.json` and use its
+ * `packageDirectories`. If neither is available, fail with a clear message.
+ */
+async function resolveSources(
+  sourceDirFlag: string | undefined,
+): Promise<ResolvedSources> {
+  if (sourceDirFlag) {
+    return { roots: [sourceDirFlag], reportBase: undefined };
+  }
+  const project = await discoverSfdxProject(process.cwd());
+  if (!project) {
+    throw new Error(
+      'No --source-dir was provided and no sfdx-project.json was found in the ' +
+        'current directory or any ancestor. Pass --source-dir <path> or run from ' +
+        'inside an sfdx project.',
+    );
+  }
+  if (project.packageDirectories.length === 0) {
+    throw new Error(
+      `sfdx-project.json at ${project.root} declares no packageDirectories. ` +
+        'Pass --source-dir <path> explicitly.',
+    );
+  }
+  return {
+    roots: project.packageDirectories,
+    reportBase: project.root,
+    sourceDescription: `Analyzing sfdx project ${project.root} (${project.packageDirectories.length} package director${project.packageDirectories.length === 1 ? 'y' : 'ies'}).`,
+  };
 }

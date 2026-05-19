@@ -5,3 +5,9 @@ tsconfig.tsbuildinfo
 .DS_Store
 *.log
 coverage/
+
+# Private fixtures — anything dropped here stays local. The directory's
+# own README is the one exception, kept committed so contributors see
+# the convention.
+test/fixtures/private/*
+!test/fixtures/private/README.md

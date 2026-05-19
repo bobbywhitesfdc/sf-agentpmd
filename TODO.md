@@ -149,32 +149,33 @@ These came up during build-out and are deferred:
           directives. Count + total length maps to the whitepaper's
           Reasoning Logic / Conversation Surface categories.
       **Two distinct on-disk shapes observed** — the parser needs both:
-        - *Decomposed* (e.g. `~/projects/myAgentSpike/.../genAiPlannerBundles/Bertie/`):
-          subdirs `agentGraph/`, `plannerActions/`, `localActions/` with
-          one file per item.
-        - *Self-contained* (e.g. `~/projects/mm-fsc-main/.../genAiPlannerBundles/MassMutual_Voice_Assistant_v2/`):
-          single `.genAiPlannerBundle` file with everything inline; only
-          plannerActions/<X>/input|output/schema.json sidecars for
+        - *Decomposed*: bundle directory contains `agentGraph/`,
+          `plannerActions/`, `localActions/` subdirs with one XML file
+          per item.
+        - *Self-contained*: bundle directory contains a single
+          `.genAiPlannerBundle` file with everything inline; only
+          `plannerActions/<X>/input|output/schema.json` sidecars for
           JSON-Schema documentation of action signatures.
       Both are valid retrieve outputs; the layout depends on API version
-      and the sf CLI retrieve flags used.
+      and the sf CLI retrieve flags used. Reference fixtures live outside
+      this repo in private workspaces — when implementing, copy minimal
+      anonymized samples into `test/fixtures/` rather than referencing
+      the live paths.
     - **BotVersion (`v*.botVersion-meta.xml`) parser**. Compute a McCabe
       analog over `<botDialogs>`/`<botSteps>`/`<intentDecision>` step
       types. Inventory flow/apex/intent invocations. Bot Builder's
       conversational graph is the closest thing to "old-style" agent
       implementation; pre-AgentScript orgs live entirely here.
-    - **Layer correlation**. An agent named `Bertie` may have a `.agent`
-      file, a `Bertie.bot-meta.xml` + `v1/v2/...` versions, AND a
-      `Bertie_v2.genAiPlannerBundle`. The report should join these by
-      api-name + version so one `--api-name Bertie` summary covers the
-      full implementation surface.
+    - **Layer correlation**. An agent with the same api-name may have a
+      `.agent` file under `aiAuthoringBundles/`, a `<name>.bot-meta.xml`
+      + `v1/v2/...` versions under `bots/`, and a `<name>_vN.genAiPlannerBundle`
+      under `genAiPlannerBundles/`. The report should join these by
+      api-name + version so one `--api-name X` summary covers the full
+      implementation surface.
     - **Open design questions**: CC convention for BotVersion XML
       (dialogs, intent decisions, conditional steps?); how to report
       version-over-version drift; whether to treat each Bot version
       separately or roll them up.
-  Concrete fixture available: `~/projects/myAgentSpike/force-app/main/default/`
-  contains Bertie/BertieVoice/BertieVoiceNext across all three formats,
-  plus an Agentforce_Service_Agent and a MassMutual_Voice_Assistant.
 
 - **v3 — four-category LOC categorizer**. Implement
   `docs/agent-loc-categorization-skill-v2.md`'s rule as

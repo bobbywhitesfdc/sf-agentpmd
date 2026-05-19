@@ -22,8 +22,10 @@
   "dependencies": {
     "@agentscript/parser-javascript": "file:./vendor/agentscript-parser-javascript",
     "@agentscript/types": "file:./vendor/agentscript-types",
+    "@apexdevtools/apex-parser": "^5.0.0",
     "@oclif/core": "^4",
-    "@salesforce/sf-plugins-core": "^11"
+    "@salesforce/sf-plugins-core": "^11",
+    "antlr4": "^4.13.2"
   },
   "devDependencies": {
     "@types/node": "^22",

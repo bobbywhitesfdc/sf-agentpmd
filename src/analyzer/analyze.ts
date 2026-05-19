@@ -12,8 +12,17 @@ import type {
 import { parseAgentSource } from './parse.js';
 import { collectScopes, complexityForFile } from './complexity.js';
 import { collectDeclarations, collectReferences } from './action-references.js';
+import { analyzeReferencedApex } from './apex-analyze.js';
 
-export async function analyzeSource(rootPath: string): Promise<AnalysisReport> {
+export interface AnalyzeOptions {
+  /** Override location for apex:// resolution. Optional. */
+  apexSourceOverride?: string;
+}
+
+export async function analyzeSource(
+  rootPath: string,
+  options: AnalyzeOptions = {},
+): Promise<AnalysisReport> {
   const absRoot = resolve(rootPath);
   const files = await findAgentFiles(absRoot);
 
@@ -22,12 +31,22 @@ export async function analyzeSource(rootPath: string): Promise<AnalysisReport> {
     fileReports.push(await analyzeFile(file, absRoot));
   }
 
+  const apex = await analyzeReferencedApex({
+    fileReports,
+    sourceDirRoot: absRoot,
+    apexSourceOverride: options.apexSourceOverride,
+    agentAbsPaths: files,
+  });
+
   const report: AnalysisReport = {
     files: fileReports,
     totalComplexity: fileReports.reduce((acc, f) => acc + f.fileComplexity, 0),
     totalDeclarations: fileReports.reduce((acc, f) => acc + f.declarations.length, 0),
     totalReferences: fileReports.reduce((acc, f) => acc + f.references.length, 0),
     byTargetKind: tallyTargets(fileReports),
+    apexClasses: apex.classes,
+    totalApexComplexity: apex.classes.reduce((acc, c) => acc + c.classComplexity, 0),
+    unresolvedApexTargets: apex.unresolved,
   };
   return report;
 }

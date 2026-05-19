@@ -62,9 +62,42 @@ export function renderText(report: AnalysisReport): string {
     }
   }
 
+  if (report.apexClasses.length || report.unresolvedApexTargets.length) {
+    lines.push('');
+    lines.push('Apex backing logic (resolved via apex:// targets)');
+    lines.push('═'.repeat(60));
+    for (const c of report.apexClasses) {
+      lines.push('');
+      lines.push(`📜 ${c.path}   class CC=${c.classComplexity}`);
+      lines.push(`   referenced by: ${c.referencedBy.join(', ') || '(none)'}`);
+      lines.push('─'.repeat(60));
+      if (c.methods.length === 0) {
+        lines.push('   (no methods with bodies)');
+      } else {
+        for (const m of c.methods) {
+          lines.push(
+            `   ${pad(m.signature, 44)} CC=${m.complexity}   ${apexBreakdown(m.contributors)}`,
+          );
+        }
+      }
+    }
+    if (report.unresolvedApexTargets.length) {
+      lines.push('');
+      lines.push('Unresolved apex:// targets:');
+      for (const u of report.unresolvedApexTargets) {
+        lines.push(`  - ${u}  (no matching .cls under source-dir or --apex-source)`);
+      }
+    }
+  }
+
   lines.push('');
   lines.push('═'.repeat(60));
-  lines.push(`TOTAL CC across ${report.files.length} file(s): ${report.totalComplexity}`);
+  lines.push('CC by location (whitepaper § 7)');
+  lines.push(
+    `  AgentScript: ${report.totalComplexity}` +
+      `   Apex: ${report.totalApexComplexity}` +
+      `   Combined: ${report.totalComplexity + report.totalApexComplexity}`,
+  );
   lines.push(
     `Action declarations: ${report.totalDeclarations}  ` +
       `(apex ${report.byTargetKind.apex}, flow ${report.byTargetKind.flow}, ` +
@@ -72,6 +105,40 @@ export function renderText(report: AnalysisReport): string {
   );
   lines.push(`Action references:   ${report.totalReferences}`);
   return lines.join('\n');
+}
+
+function apexBreakdown(contributors: AnalysisReport['apexClasses'][number]['methods'][number]['contributors']): string {
+  if (contributors.length === 0) return '(base only)';
+  const counts: Record<string, number> = {};
+  for (const c of contributors) counts[c.kind] = (counts[c.kind] ?? 0) + 1;
+  return Object.entries(counts)
+    .map(([k, n]) => `${shortApexKind(k)}=${n}`)
+    .join(' ');
+}
+
+function shortApexKind(k: string): string {
+  switch (k) {
+    case 'if_statement':
+      return 'if';
+    case 'for_statement':
+      return 'for';
+    case 'while_statement':
+      return 'while';
+    case 'do_while_statement':
+      return 'do-while';
+    case 'when_arm':
+      return 'when';
+    case 'catch_clause':
+      return 'catch';
+    case 'ternary':
+      return 'ternary';
+    case 'short_circuit_and':
+      return '&&';
+    case 'short_circuit_or':
+      return '||';
+    default:
+      return k;
+  }
 }
 
 function groupByScope(procs: ProcedureCC[]): Map<string, ProcedureCC[]> {

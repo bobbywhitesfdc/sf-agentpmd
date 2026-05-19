@@ -8,9 +8,9 @@ The intent (per `docs/agent-loc-categorization-skill-v2.md` § 7) is the
 by-the-book number a SonarQube / PMD / Checkstyle run would produce — but
 applied to the AgentScript surface that those tools don't cover today.
 
-## v1 scope
+## Current scope (v2)
 
-`sf agentpmd analyze --source-dir <dir|file>`
+`sf agentpmd analyze --source-dir <dir|file> [--apex-source <dir>] [--fail-on N]`
 
 - Walks every `.agent` file under the given path.
 - For each `before_reasoning:`, `after_reasoning:`, and
@@ -29,15 +29,37 @@ applied to the AgentScript surface that those tools don't cover today.
 - Collects all `actions:` declarations and classifies their `target:` URI
   (`apex://`, `flow://`, `prompt://`, …).
 - Counts how many times each declared action is referenced from
-  `reasoning.actions`, `before_reasoning`, `after_reasoning`, and
-  `transition` statements.
+  `reasoning.actions`, `reasoning.instructions`, `before_reasoning`,
+  `after_reasoning`, and `transition` statements.
+- For every `apex://ClassName` target, resolves the `.cls` file by walking
+  up from the `.agent` location looking for a sibling `classes/` directory
+  (or honors `--apex-source <dir>`), parses it with
+  `@apexdevtools/apex-parser`, and computes per-method McCabe CC for every
+  method and constructor with a body:
+
+  ```
+  CC = 1
+     + count(if)
+     + count(for)         // includes enhanced-for
+     + count(while)
+     + count(do-while)
+     + count(when arm)    // each switch `when X { ... }`; `when else` excluded
+     + count(catch)
+     + count(ternary ?:)
+     + count(&&)
+     + count(||)
+  ```
+
+- Emits a **CC by location** rollup (AgentScript vs. Apex vs. Combined),
+  matching the whitepaper § 7 framing.
 
 ### Flags
 
 | Flag | Purpose |
 | --- | --- |
 | `-d, --source-dir <path>` | Directory or single `.agent` file. Required. |
-| `--fail-on <N>` | Exit non-zero (code 2) if total CC ≥ N. Useful in CI. |
+| `--apex-source <path>` | Override directory for resolving `apex://` targets. Default: walk up from each `.agent` looking for a `classes/` sibling. |
+| `--fail-on <N>` | Exit non-zero (code 2) if **combined** (agent + Apex) CC ≥ N. Useful in CI. |
 | `--json` | Machine-readable report on stdout. |
 
 ### Example
@@ -58,24 +80,23 @@ AgentForce PMD — Cyclomatic Complexity (McCabe)
 
 ## Roadmap
 
-The plugin is built so v2 / v3 can grow inward without restructuring:
-
-- **v2** — follow `apex://` action targets into Apex classes; compute CC for
-  invocable methods using a SonarQube-equivalent rule set; emit the
-  "CC by location" split (agent-script vs. Apex) called out in the
-  whitepaper.
 - **v3** — implement the four-category LOC rule from
   `docs/agent-loc-categorization-skill-v2.md` (Scaffolding, Deterministic
   Logic, Reasoning Logic, Conversation Surface) as a separate sub-command
   (`sf agentpmd categorize-loc`).
+- **future** — Flow incorporation (§ 9 of the whitepaper) once a CC analog
+  for Flow elements is settled.
 
-## How it parses AgentScript
+## How it parses
 
-We do **not** use a heuristic regex scanner. The CST comes from the
-hand-written TypeScript parser in
-[`@agentscript/parser-javascript`](https://github.com/salesforce/agentscript/tree/main/packages/parser-javascript),
-vendored under `vendor/` because the upstream package isn't published to
-npm yet.
+We do **not** use heuristic regex scanners. Two real parsers do the work:
+
+- **AgentScript** — the hand-written TypeScript parser in
+  [`@agentscript/parser-javascript`](https://github.com/salesforce/agentscript/tree/main/packages/parser-javascript),
+  vendored under `vendor/` because the upstream package isn't published to
+  npm yet.
+- **Apex** — [`@apexdevtools/apex-parser`](https://github.com/apex-dev-tools/apex-parser)
+  v5.0.0, an actively-maintained ANTLR4 TypeScript port. Pure-Node, no JVM.
 
 To resync the vendor copies after pulling new upstream commits:
 
@@ -93,16 +114,20 @@ That copies the freshly-built `dist/` from
 src/
   commands/agentpmd/analyze.ts   # sf agentpmd analyze
   analyzer/
-    parse.ts                     # parser wrappers + CST helpers
-    complexity.ts                # McCabe CC walker
+    parse.ts                     # AgentScript CST helpers
+    complexity.ts                # AgentScript McCabe CC walker
     action-references.ts         # @actions.X declarations & references
-    analyze.ts                   # file discovery + orchestrator
-    report.ts                    # text/json rendering
+    apex-parse.ts                # @apexdevtools/apex-parser wrappers
+    apex-complexity.ts           # Apex McCabe CC walker
+    apex-resolve.ts              # apex://ClassName → .cls path resolver
+    apex-analyze.ts              # orchestrator for the Apex pass
+    analyze.ts                   # file discovery + top-level orchestrator
+    report.ts                    # text/json rendering (incl. § 7 split)
     types.ts                     # public types
   index.ts                       # programmatic entry
 test/
-  fixtures/*.agent               # CST fixtures
-  analyzer/*.spec.ts             # vitest unit tests
+  fixtures/                      # synthetic + gametwo fixtures
+  analyzer/*.spec.ts             # vitest unit + integration tests
 vendor/
   agentscript-types/             # vendored from agentscript monorepo
   agentscript-parser-javascript/

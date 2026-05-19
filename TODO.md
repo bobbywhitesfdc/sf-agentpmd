@@ -125,7 +125,39 @@ These came up during build-out and are deferred:
       and `plannerActions/`, `localActions/` subdirs. Extract action
       declarations, their target type (apex/flow/prompt), attribute
       mappings (variable plumbing). Roll these up alongside the AgentScript
-      action inventory.
+      action inventory. Concrete vocabulary observed in fixtures:
+        - `<localTopics>` — each is a routing destination (≈ AgentScript
+          `topic`). Holds `<scope>`, `<genAiPluginInstructions>` (multiple,
+          sortOrder'd), `<localActions>`, `<localActionLinks>`.
+        - `<plannerActions>` — top-level (planner-shared) actions.
+        - `<localActions>` (inline inside a topic) — each has
+          `<invocationTarget>` + `<invocationTargetType>` (values seen:
+          `apex`, `generatePromptResponse`, `standardInvocableAction`;
+          `flow` and `flowInvocation` also live in the schema).
+          Direct parallel to AgentScript's `target: "apex://X"` lines —
+          same Apex follow-through pass would work here.
+        - `<attributeMappings>` — variable plumbing (action I/O ↔ planner
+          variable). Count is a "wiring complexity" metric, not branching.
+        - `<ruleExpressions>` + `<conditions>` (`<leftOperand>`,
+          `<operator>`, `<rightOperandValue>`) — **this is where
+          conditional logic actually lives** in planner bundles, not in
+          dialog steps. Each rule expression is a branch.
+        - `<plannerSurfaces>` — channel surfaces (Messaging,
+          CustomerWebClient, Telephony). Not CC-relevant but worth
+          inventorying for posture analysis.
+        - `<genAiPluginInstructions>` per topic — natural-language
+          directives. Count + total length maps to the whitepaper's
+          Reasoning Logic / Conversation Surface categories.
+      **Two distinct on-disk shapes observed** — the parser needs both:
+        - *Decomposed* (e.g. `~/projects/myAgentSpike/.../genAiPlannerBundles/Bertie/`):
+          subdirs `agentGraph/`, `plannerActions/`, `localActions/` with
+          one file per item.
+        - *Self-contained* (e.g. `~/projects/mm-fsc-main/.../genAiPlannerBundles/MassMutual_Voice_Assistant_v2/`):
+          single `.genAiPlannerBundle` file with everything inline; only
+          plannerActions/<X>/input|output/schema.json sidecars for
+          JSON-Schema documentation of action signatures.
+      Both are valid retrieve outputs; the layout depends on API version
+      and the sf CLI retrieve flags used.
     - **BotVersion (`v*.botVersion-meta.xml`) parser**. Compute a McCabe
       analog over `<botDialogs>`/`<botSteps>`/`<intentDecision>` step
       types. Inventory flow/apex/intent invocations. Bot Builder's

@@ -114,9 +114,40 @@ sf plugins install sf-agentpmd             # end-user install path
 
 These came up during build-out and are deferred:
 
+- **Multi-format agent analysis** (`bots/`, `genAiPlannerBundles/`). The
+  current plugin only sees one of three coordinated layers that make up a
+  Salesforce agent. Surfaced by `myAgentSpike` where the .agent file is
+  near-empty (CC ≈ 1 per topic) but the real implementation lives in
+  `genAiPlannerBundles/<Name>/plannerActions/*.xml` and
+  `bots/<Name>/v*.botVersion-meta.xml`. To be useful as an org-wide review
+  tool we need:
+    - **GenAiPlannerBundle parser**. Walk the `.genAiPlannerBundle` XML
+      and `plannerActions/`, `localActions/` subdirs. Extract action
+      declarations, their target type (apex/flow/prompt), attribute
+      mappings (variable plumbing). Roll these up alongside the AgentScript
+      action inventory.
+    - **BotVersion (`v*.botVersion-meta.xml`) parser**. Compute a McCabe
+      analog over `<botDialogs>`/`<botSteps>`/`<intentDecision>` step
+      types. Inventory flow/apex/intent invocations. Bot Builder's
+      conversational graph is the closest thing to "old-style" agent
+      implementation; pre-AgentScript orgs live entirely here.
+    - **Layer correlation**. An agent named `Bertie` may have a `.agent`
+      file, a `Bertie.bot-meta.xml` + `v1/v2/...` versions, AND a
+      `Bertie_v2.genAiPlannerBundle`. The report should join these by
+      api-name + version so one `--api-name Bertie` summary covers the
+      full implementation surface.
+    - **Open design questions**: CC convention for BotVersion XML
+      (dialogs, intent decisions, conditional steps?); how to report
+      version-over-version drift; whether to treat each Bot version
+      separately or roll them up.
+  Concrete fixture available: `~/projects/myAgentSpike/force-app/main/default/`
+  contains Bertie/BertieVoice/BertieVoiceNext across all three formats,
+  plus an Agentforce_Service_Agent and a MassMutual_Voice_Assistant.
+
 - **v3 — four-category LOC categorizer**. Implement
   `docs/agent-loc-categorization-skill-v2.md`'s rule as
-  `sf agentpmd categorize-loc`. Largest remaining feature.
+  `sf agentpmd categorize-loc`. Largest remaining feature on the AgentScript
+  side.
 - **`--out <file>` flag**. Write report directly to a file instead of stdout.
   Useful for `sf agentpmd analyze --format markdown --out report.md`.
 - **`--include-class <regex>`**. Filter Apex side of the analysis.

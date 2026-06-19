@@ -1,0 +1,32 @@
+name: deprecate version
+
+# Registry write operations (deprecate/undeprecate) require 2FA for
+# interactive npm sessions. The NPM_TOKEN automation secret bypasses 2FA,
+# so we run them here in CI instead of locally. Trigger from the Actions tab
+# or: gh workflow run deprecate.yml -f version=0.1.0 -f message="..."
+#
+# To UN-deprecate a version, pass an empty message ("").
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version or range to deprecate, e.g. 0.1.0 or "<0.1.1"'
+        required: true
+      message:
+        description: 'Deprecation message (empty string un-deprecates)'
+        required: true
+        default: 'Deprecated — install the latest: sf plugins install sf-agentpmd@latest'
+
+jobs:
+  deprecate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: latest
+          registry-url: 'https://registry.npmjs.org'
+      - name: npm deprecate
+        run: npm deprecate "sf-agentpmd@${{ inputs.version }}" "${{ inputs.message }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,5 +1,6 @@
-import { parse as parseAgent } from '@agentscript/parser-javascript';
 import type { SyntaxNode } from '@agentscript/types';
+
+import { parse as parseAgent } from '@agentscript/parser-javascript';
 
 export function parseAgentSource(source: string): SyntaxNode {
   return parseAgent(source).rootNode;
@@ -7,10 +8,10 @@ export function parseAgentSource(source: string): SyntaxNode {
 
 export function locOf(n: SyntaxNode) {
   return {
-    startRow: n.startRow,
-    startCol: n.startCol,
-    endRow: n.endRow,
     endCol: n.endCol,
+    endRow: n.endRow,
+    startCol: n.startCol,
+    startRow: n.startRow,
   };
 }
 
@@ -30,11 +31,11 @@ export function* descendants(node: SyntaxNode): Generator<SyntaxNode> {
  * We return the first whitespace-delimited token as the key kind, and the
  * remainder (if any) as the instance label.
  */
-export function keyHeader(n: SyntaxNode): { kind: string; label?: string } | null {
+export function keyHeader(n: SyntaxNode): null | { kind: string; label?: string } {
   if (n.type !== 'key') return null;
   const head = n.text.split('\n', 1)[0];
   const colon = head.indexOf(':');
-  const lhs = (colon >= 0 ? head.slice(0, colon) : head).trim();
+  const lhs = (colon === -1 ? head : head.slice(0, colon)).trim();
   const parts = lhs.split(/\s+/);
   return { kind: parts[0], label: parts.length > 1 ? parts.slice(1).join(' ') : undefined };
 }
@@ -43,7 +44,7 @@ export function keyHeader(n: SyntaxNode): { kind: string; label?: string } | nul
  * The CST shapes a key/value pair as `mapping_element { key, ':', value }`.
  * Given the mapping_element node, return its key kind + label.
  */
-export function mappingKeyHeader(m: SyntaxNode): { kind: string; label?: string } | null {
+export function mappingKeyHeader(m: SyntaxNode): null | { kind: string; label?: string } {
   if (m.type !== 'mapping_element') return null;
   const keyNode = m.childForFieldName('key');
   if (!keyNode) {
@@ -51,8 +52,10 @@ export function mappingKeyHeader(m: SyntaxNode): { kind: string; label?: string 
     for (const c of m.namedChildren) {
       if (c.type === 'key') return keyHeader(c);
     }
+
     return null;
   }
+
   return keyHeader(keyNode);
 }
 
@@ -65,13 +68,14 @@ export function mappingKeyHeader(m: SyntaxNode): { kind: string; label?: string 
  * markers and the actual value-bearing child. Skip them so we don't return a
  * comment as the "value."
  */
-const NON_VALUE_NAMED_TYPES = new Set(['key', 'comment']);
+const NON_VALUE_NAMED_TYPES = new Set(['comment', 'key']);
 
 export function mappingValue(m: SyntaxNode): SyntaxNode | undefined {
   if (m.type !== 'mapping_element') return undefined;
   for (const c of m.namedChildren) {
     if (!NON_VALUE_NAMED_TYPES.has(c.type)) return c;
   }
+
   return undefined;
 }
 
@@ -86,6 +90,7 @@ export function findMappingEntry(parentBody: SyntaxNode, kind: string): SyntaxNo
     const h = mappingKeyHeader(c);
     if (h && h.kind === kind) return mappingValue(c);
   }
+
   return undefined;
 }
 
@@ -96,7 +101,7 @@ export function findMappingEntry(parentBody: SyntaxNode, kind: string): SyntaxNo
  * at the source-file level; the body is the sibling value.
  */
 export function bodyOf(scopeKey: SyntaxNode): SyntaxNode | undefined {
-  const parent = scopeKey.parent;
+  const {parent} = scopeKey;
   if (!parent) return undefined;
   return mappingValue(parent);
 }
@@ -122,6 +127,7 @@ export function extractDeveloperName(root: SyntaxNode): string | undefined {
     if (!devNameVal) return undefined;
     return extractStringLiteral(devNameVal);
   }
+
   return undefined;
 }
 
@@ -135,5 +141,6 @@ export function extractStringLiteral(n: SyntaxNode): string | undefined {
       return t;
     }
   }
+
   return undefined;
 }

@@ -51,7 +51,7 @@ To check whether you're on the latest:
 
 ```bash
 sf plugins                              # shows installed version
-npm view sf-agentpmd version            # shows current published version
+npm view sf-agentpmd version   # shows current published version
 ```
 
 ## Downgrade
@@ -84,6 +84,20 @@ cd ~/projects/AgentForcePMD
 sf plugins link "$(pwd)"
 ```
 
+## Refreshing the Claude Code skill
+
+The bundled skill ships inside the plugin, so a plugin upgrade may carry
+new skill content. After upgrading, re-copy the skill tree:
+
+```bash
+sf agentpmd install-skill   # re-copies skill/ to ~/.claude/skills/agentforcepmd/
+```
+
+Restart Claude Code (or reload skills) to pick up the new content. If you
+use a local-dev symlink (`~/.claude/skills/agentforcepmd` -> the repo's
+`skill/` directory), no re-copy is needed — a `git pull` updates the
+skill in place.
+
 ## Verifying the upgrade
 
 Always sanity-check after upgrading:
@@ -91,7 +105,7 @@ Always sanity-check after upgrading:
 ```bash
 sf agentpmd analyze --help              # confirm new flags / removed flags
 sf agentpmd --version 2>/dev/null \
-  || sf plugins | grep sf-agentpmd      # confirm version bump
+  || sf plugins | grep agentpmd         # confirm version bump
 ```
 
 If the plugin gained new commands, they appear under the `agentpmd`

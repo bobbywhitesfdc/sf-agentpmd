@@ -1,9 +1,11 @@
 node_modules/
+dist/
 lib/
 oclif.manifest.json
 tsconfig.tsbuildinfo
 .DS_Store
 *.log
+*.tgz
 coverage/
 
 # Private fixtures — anything dropped here stays local. The directory's

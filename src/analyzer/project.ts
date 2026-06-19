@@ -2,10 +2,10 @@ import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 export interface SfdxProject {
-  /** Absolute path of the project root (the directory containing sfdx-project.json). */
-  root: string;
   /** Absolute paths of every `packageDirectories[].path`, in declaration order. */
   packageDirectories: string[];
+  /** Absolute path of the project root (the directory containing sfdx-project.json). */
+  root: string;
 }
 
 /**
@@ -19,10 +19,11 @@ export async function discoverSfdxProject(
   let dir = resolve(startDir);
   while (true) {
     const candidate = join(dir, 'sfdx-project.json');
-    const s = await stat(candidate).catch(() => undefined);
+    const s = await stat(candidate).catch(() => {});
     if (s?.isFile()) {
-      return await readProject(dir, candidate);
+      return readProject(dir, candidate);
     }
+
     const parent = dirname(dir);
     if (parent === dir) return undefined;
     dir = parent;
@@ -34,13 +35,14 @@ async function readProject(root: string, jsonPath: string): Promise<SfdxProject>
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch (err) {
+  } catch (error) {
     throw new Error(
-      `failed to parse ${jsonPath}: ${(err as Error).message}`,
+      `failed to parse ${jsonPath}: ${(error as Error).message}`,
     );
   }
+
   const pkgs = extractPackageDirectories(parsed, root);
-  return { root, packageDirectories: pkgs };
+  return { packageDirectories: pkgs, root };
 }
 
 function extractPackageDirectories(parsed: unknown, root: string): string[] {
@@ -54,5 +56,6 @@ function extractPackageDirectories(parsed: unknown, root: string): string[] {
     if (typeof pathField !== 'string' || pathField.length === 0) continue;
     out.push(isAbsolute(pathField) ? pathField : resolve(root, pathField));
   }
+
   return out;
 }

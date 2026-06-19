@@ -1,5 +1,7 @@
 import type { SyntaxNode } from '@agentscript/types';
+
 import type { CCContributor, ProcedureCC, SourceLocation } from './types.js';
+
 import { bodyOf, descendants, findMappingEntry, keyHeader, locOf } from './parse.js';
 
 /**
@@ -23,29 +25,36 @@ export function complexityOf(body: SyntaxNode, scope: string, kind: ProcedureCC[
   const contributors: CCContributor[] = [];
   for (const n of descendants(body)) {
     switch (n.type) {
-      case 'if_statement':
-        contributors.push({ kind: 'if_statement', location: locOf(n) });
-        break;
-      case 'elif_clause':
-        contributors.push({ kind: 'elif_clause', location: locOf(n) });
-        break;
-      case 'ternary_expression':
-        contributors.push({ kind: 'ternary_expression', location: locOf(n) });
-        break;
       case 'binary_expression': {
         const op = binaryOperator(n);
         if (op === 'and') contributors.push({ kind: 'short_circuit_and', location: locOf(n) });
         else if (op === 'or') contributors.push({ kind: 'short_circuit_or', location: locOf(n) });
         break;
       }
+
+      case 'elif_clause': {
+        contributors.push({ kind: 'elif_clause', location: locOf(n) });
+        break;
+      }
+
+      case 'if_statement': {
+        contributors.push({ kind: 'if_statement', location: locOf(n) });
+        break;
+      }
+
+      case 'ternary_expression': {
+        contributors.push({ kind: 'ternary_expression', location: locOf(n) });
+        break;
+      }
     }
   }
+
   return {
-    scope,
-    kind,
     complexity: 1 + contributors.length,
     contributors,
+    kind,
     location: locOf(body),
+    scope,
   };
 }
 
@@ -54,6 +63,7 @@ function binaryOperator(n: SyntaxNode): string | undefined {
     if (!c.isNamed && SHORT_CIRCUIT_OPS.has(c.type)) return c.type;
     if (!c.isNamed && (c.type === '+' || c.type === '-' || c.type === '*' || c.type === '/')) return c.type;
   }
+
   return undefined;
 }
 
@@ -88,12 +98,12 @@ export function collectProcedures(scopeBody: SyntaxNode, scopeLabel: string): Pr
 }
 
 /** Scopes that contain procedure-bearing blocks. */
-const PROCEDURE_SCOPES = new Set(['start_agent', 'topic', 'subagent']);
+const PROCEDURE_SCOPES = new Set(['start_agent', 'subagent', 'topic']);
 
 export interface AgentScope {
   body: SyntaxNode;
-  label: string;
   kind: string;
+  label: string;
 }
 
 /**
@@ -113,8 +123,9 @@ export function collectScopes(root: SyntaxNode): AgentScope[] {
     if (!h || !PROCEDURE_SCOPES.has(h.kind)) continue;
     const body = bodyOf(keyNode);
     if (!body) continue;
-    scopes.push({ body, label: `${h.kind} ${h.label ?? ''}`.trim(), kind: h.kind });
+    scopes.push({ body, kind: h.kind, label: `${h.kind} ${h.label ?? ''}`.trim() });
   }
+
   return scopes;
 }
 
@@ -128,10 +139,11 @@ export function complexityForFile(root: SyntaxNode): FileComplexity {
   for (const s of collectScopes(root)) {
     procedures.push(...collectProcedures(s.body, s.label));
   }
+
   const total = procedures.reduce((acc, p) => acc + p.complexity, 0);
   return { procedures, total };
 }
 
 export function dummyLoc(): SourceLocation {
-  return { startRow: 0, startCol: 0, endRow: 0, endCol: 0 };
+  return { endCol: 0, endRow: 0, startCol: 0, startRow: 0 };
 }

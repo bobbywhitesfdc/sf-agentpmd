@@ -1,25 +1,26 @@
 import {
-  MethodDeclarationContext,
-  ConstructorDeclarationContext,
-  IfStatementContext,
-  ForStatementContext,
-  WhileStatementContext,
-  DoWhileStatementContext,
-  WhenControlContext,
   CatchClauseContext,
+  type CompilationUnitContext,
   CondExpressionContext,
+  ConstructorDeclarationContext,
+  DoWhileStatementContext,
+  type FormalParametersContext,
+  ForStatementContext,
+  IfStatementContext,
   LogAndExpressionContext,
   LogOrExpressionContext,
-  type CompilationUnitContext,
-  type FormalParametersContext,
+  MethodDeclarationContext,
+  WhenControlContext,
+  WhileStatementContext,
 } from '@apexdevtools/apex-parser';
-import type { ParserRuleContext } from 'antlr4';
+
 import type {
   ApexCCContributor,
   ApexCCContributorKind,
   ApexMethodCC,
 } from './types.js';
-import { locOfCtx, walkParseTree } from './apex-parse.js';
+
+import { type ApexRuleNode, locOfCtx, walkParseTree } from './apex-parse.js';
 
 /**
  * Standard McCabe Cyclomatic Complexity for Apex, per the SonarQube /
@@ -40,7 +41,7 @@ import { locOfCtx, walkParseTree } from './apex-parse.js';
  * Not counted: else, when else, finally, try itself.
  */
 export function complexityOfMethod(
-  methodCtx: MethodDeclarationContext | ConstructorDeclarationContext,
+  methodCtx: ConstructorDeclarationContext | MethodDeclarationContext,
 ): ApexMethodCC {
   const body = methodCtx.block();
   const contributors: ApexCCContributor[] = [];
@@ -75,16 +76,16 @@ export function complexityOfMethod(
   const signature = renderSignature(methodCtx, name);
 
   return {
-    name,
-    kind: methodCtx instanceof ConstructorDeclarationContext ? 'constructor' : 'method',
-    signature,
     complexity: 1 + contributors.length,
     contributors,
+    kind: methodCtx instanceof ConstructorDeclarationContext ? 'constructor' : 'method',
     location: locOfCtx(methodCtx),
+    name,
+    signature,
   };
 }
 
-function classifyContributor(node: ParserRuleContext): ApexCCContributorKind | undefined {
+function classifyContributor(node: ApexRuleNode): ApexCCContributorKind | undefined {
   if (node instanceof IfStatementContext) return 'if_statement';
   if (node instanceof ForStatementContext) return 'for_statement';
   if (node instanceof WhileStatementContext) return 'while_statement';
@@ -95,6 +96,7 @@ function classifyContributor(node: ParserRuleContext): ApexCCContributorKind | u
     const elseTok = wv && typeof wv.ELSE === 'function' ? wv.ELSE() : undefined;
     return elseTok ? undefined : 'when_arm';
   }
+
   if (node instanceof CatchClauseContext) return 'catch_clause';
   if (node instanceof CondExpressionContext) return 'ternary';
   if (node instanceof LogAndExpressionContext) return 'short_circuit_and';
@@ -103,20 +105,22 @@ function classifyContributor(node: ParserRuleContext): ApexCCContributorKind | u
 }
 
 function enclosingMethod(
-  node: ParserRuleContext,
-): MethodDeclarationContext | ConstructorDeclarationContext | undefined {
-  let p: ParserRuleContext | undefined = node.parentCtx as ParserRuleContext | undefined;
+  node: ApexRuleNode,
+): ConstructorDeclarationContext | MethodDeclarationContext | undefined {
+  let p: ApexRuleNode | undefined = node.parentCtx;
   while (p) {
     if (p instanceof MethodDeclarationContext || p instanceof ConstructorDeclarationContext) {
       return p;
     }
-    p = p.parentCtx as ParserRuleContext | undefined;
+
+    p = p.parentCtx;
   }
+
   return undefined;
 }
 
 function renderSignature(
-  ctx: MethodDeclarationContext | ConstructorDeclarationContext,
+  ctx: ConstructorDeclarationContext | MethodDeclarationContext,
   name: string,
 ): string {
   const paramsText = renderFormalParameters(ctx.formalParameters());
@@ -124,6 +128,7 @@ function renderSignature(
     const retType = ctx.typeRef()?.getText() ?? (ctx.VOID() ? 'void' : '');
     return `${retType ? retType + ' ' : ''}${name}${paramsText}`;
   }
+
   return `${name}${paramsText}`;
 }
 
@@ -151,9 +156,9 @@ function renderFormalParameters(params: FormalParametersContext | null): string 
  * v2 scope ("all methods in any class touched by apex://").
  */
 export function methodsInCompilationUnit(cu: CompilationUnitContext): Array<
-  MethodDeclarationContext | ConstructorDeclarationContext
+  ConstructorDeclarationContext | MethodDeclarationContext
 > {
-  const out: Array<MethodDeclarationContext | ConstructorDeclarationContext> = [];
+  const out: Array<ConstructorDeclarationContext | MethodDeclarationContext> = [];
   walkParseTree(cu, node => {
     if (
       (node instanceof MethodDeclarationContext ||

@@ -1,83 +1,83 @@
 export interface SourceLocation {
-  startRow: number;
-  startCol: number;
-  endRow: number;
   endCol: number;
+  endRow: number;
+  startCol: number;
+  startRow: number;
 }
 
 export interface ProcedureCC {
-  scope: string;
-  kind: 'before_reasoning' | 'after_reasoning' | 'reasoning_instructions' | 'available_when' | 'other';
   complexity: number;
   contributors: CCContributor[];
+  kind: 'after_reasoning' | 'available_when' | 'before_reasoning' | 'other' | 'reasoning_instructions';
   location: SourceLocation;
+  scope: string;
 }
 
 export interface CCContributor {
-  kind: 'if_statement' | 'elif_clause' | 'ternary_expression' | 'short_circuit_and' | 'short_circuit_or';
+  kind: 'elif_clause' | 'if_statement' | 'short_circuit_and' | 'short_circuit_or' | 'ternary_expression';
   location: SourceLocation;
 }
 
-export type ActionTargetKind = 'apex' | 'flow' | 'prompt' | 'utils' | 'unknown';
+export type ActionTargetKind = 'apex' | 'flow' | 'prompt' | 'unknown' | 'utils';
 
 export interface ActionDeclaration {
+  location: SourceLocation;
   name: string;
   scope: string;
   target?: string;
   targetKind: ActionTargetKind;
-  location: SourceLocation;
 }
 
 export type ActionReferenceContext =
-  | 'reasoning_actions'
-  | 'reasoning_instructions_run'
   | 'after_reasoning_run'
   | 'before_reasoning_run'
+  | 'reasoning_actions'
+  | 'reasoning_instructions_run'
   | 'transition'
   | 'unknown';
 
 export interface ActionReference {
-  name: string;
-  scope: string;
   context: ActionReferenceContext;
   location: SourceLocation;
+  name: string;
+  scope: string;
 }
 
 export interface FileReport {
+  declarations: ActionDeclaration[];
+  fileComplexity: number;
+  parseErrors: ParseDiagnostic[];
   path: string;
   procedures: ProcedureCC[];
-  fileComplexity: number;
-  declarations: ActionDeclaration[];
   references: ActionReference[];
-  parseErrors: ParseDiagnostic[];
 }
 
 export interface ParseDiagnostic {
-  message: string;
   location: SourceLocation;
+  message: string;
 }
 
 export interface AnalysisReport {
+  apexClasses: ApexClassReport[];
+  byTargetKind: Record<ActionTargetKind, number>;
   files: FileReport[];
+  totalApexComplexity: number;
   totalComplexity: number;
   totalDeclarations: number;
   totalReferences: number;
-  byTargetKind: Record<ActionTargetKind, number>;
-  apexClasses: ApexClassReport[];
-  totalApexComplexity: number;
   unresolvedApexTargets: string[];
 }
 
 export type ApexCCContributorKind =
-  | 'if_statement'
-  | 'for_statement'
-  | 'while_statement'
-  | 'do_while_statement'
-  | 'when_arm'
   | 'catch_clause'
-  | 'ternary'
+  | 'do_while_statement'
+  | 'for_statement'
+  | 'if_statement'
   | 'short_circuit_and'
-  | 'short_circuit_or';
+  | 'short_circuit_or'
+  | 'ternary'
+  | 'when_arm'
+  | 'while_statement';
 
 export interface ApexCCContributor {
   kind: ApexCCContributorKind;
@@ -85,20 +85,20 @@ export interface ApexCCContributor {
 }
 
 export interface ApexMethodCC {
-  name: string;
-  kind: 'method' | 'constructor';
-  signature: string;
   complexity: number;
   contributors: ApexCCContributor[];
+  kind: 'constructor' | 'method';
   location: SourceLocation;
+  name: string;
+  signature: string;
 }
 
 export interface ApexClassReport {
+  classComplexity: number;
   className: string;
+  methods: ApexMethodCC[];
+  parseErrors: ParseDiagnostic[];
   path: string;
   /** Bundles or actions whose target resolves here. */
   referencedBy: string[];
-  methods: ApexMethodCC[];
-  classComplexity: number;
-  parseErrors: ParseDiagnostic[];
 }

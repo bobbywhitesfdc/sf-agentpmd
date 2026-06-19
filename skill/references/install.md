@@ -55,8 +55,6 @@ install path applies:
 
 ```bash
 sf plugins install sf-agentpmd
-# or, if published under a scope:
-sf plugins install @bobbywhitesfdc/sf-agentpmd
 ```
 
 Verify the same way:
@@ -67,6 +65,27 @@ sf agentpmd analyze --help
 ```
 
 No build step, no link. Plain npm install under the hood.
+
+## Install the Claude Code skill
+
+The plugin bundles this Claude Code skill. After the plugin is installed
+(Path A or Path B), copy the skill tree into `~/.claude/skills/` with:
+
+```bash
+sf agentpmd install-skill
+```
+
+This recursively copies the bundled `skill/` tree (SKILL.md plus the
+`references/` pages) to `~/.claude/skills/agentforcepmd/`. Restart Claude
+Code (or reload skills) to activate it.
+
+For an npm install, the bundled source lives at
+`node_modules/sf-agentpmd/skill/`; local-dev contributors can instead
+symlink the in-repo `skill/` directory:
+
+```bash
+ln -sfn ~/projects/AgentForcePMD/skill ~/.claude/skills/agentforcepmd
+```
 
 ## Prerequisites
 

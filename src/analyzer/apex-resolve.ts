@@ -9,7 +9,7 @@ export function extractApexClassName(uri: string): string | undefined {
   // `apex://Foo` or `apex://namespace__Foo`; take the trailing simple name.
   const raw = m[1].trim();
   const dot = raw.lastIndexOf('.');
-  return dot >= 0 ? raw.slice(dot + 1) : raw;
+  return dot === -1 ? raw : raw.slice(dot + 1);
 }
 
 export interface ResolveOptions {
@@ -19,14 +19,14 @@ export interface ResolveOptions {
    */
   agentFilePath: string;
   /**
-   * The CLI `--source-dir` value. We never walk above this directory.
-   */
-  sourceDirRoot: string;
-  /**
    * Optional `--apex-source` override. When set, classes are looked up here
    * before falling back to the upward walk.
    */
   apexSourceOverride?: string;
+  /**
+   * The CLI `--source-dir` value. We never walk above this directory.
+   */
+  sourceDirRoot: string;
 }
 
 /**
@@ -51,8 +51,10 @@ export async function resolveApexClassPath(
     const override = isAbsolute(opts.apexSourceOverride)
       ? opts.apexSourceOverride
       : resolve(opts.apexSourceOverride);
-    candidates.push(join(override, `${className}.cls`));
-    candidates.push(join(override, 'classes', `${className}.cls`));
+    candidates.push(
+      join(override, `${className}.cls`),
+      join(override, 'classes', `${className}.cls`),
+    );
   }
 
   const stop = resolve(opts.sourceDirRoot);
@@ -66,9 +68,10 @@ export async function resolveApexClassPath(
   }
 
   for (const c of candidates) {
-    const s = await stat(c).catch(() => undefined);
+    const s = await stat(c).catch(() => {});
     if (s?.isFile()) return c;
   }
+
   return undefined;
 }
 

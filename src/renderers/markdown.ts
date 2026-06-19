@@ -1,18 +1,18 @@
 import type {
   AnalysisReport,
   ApexCCContributor,
-  ApexClassReport,
+  
   CCContributor,
   FileReport,
   ProcedureCC,
 } from '../analyzer/types.js';
 
 const KIND_LABEL: Record<ProcedureCC['kind'], string> = {
-  before_reasoning: 'before_reasoning',
   after_reasoning: 'after_reasoning',
-  reasoning_instructions: 'reasoning.instructions',
   available_when: 'available_when',
+  before_reasoning: 'before_reasoning',
   other: 'other',
+  reasoning_instructions: 'reasoning.instructions',
 };
 
 /**
@@ -26,14 +26,11 @@ const KIND_LABEL: Record<ProcedureCC['kind'], string> = {
  */
 export function renderMarkdown(report: AnalysisReport): string {
   const lines: string[] = [];
-  lines.push('# AgentForce PMD — Cyclomatic Complexity (McCabe)');
-  lines.push('');
-  lines.push(
+  lines.push('# AgentForce PMD — Cyclomatic Complexity (McCabe)', '', 
     'Per the categorization rule § 7, CC is reported by the standard ' +
       'McCabe convention used in SonarQube / PMD / Checkstyle for the ' +
-      'relevant language.',
+      'relevant language.', ''
   );
-  lines.push('');
 
   if (report.files.length === 0) {
     lines.push('_(no `.agent` files found)_');
@@ -41,41 +38,29 @@ export function renderMarkdown(report: AnalysisReport): string {
   }
 
   // ── CC by location chart ──────────────────────────────────────────
-  lines.push('## CC by location');
-  lines.push('');
-  lines.push(renderMermaid(report));
-  lines.push('');
-  lines.push(
+  lines.push('## CC by location', '',
+    renderMermaid(report), '',
     `| | AgentScript | Apex | Combined |\n` +
       `| --- | ---: | ---: | ---: |\n` +
-      `| **Totals** | ${report.totalComplexity} | ${report.totalApexComplexity} | ${report.totalComplexity + report.totalApexComplexity} |`,
-  );
-  lines.push('');
-
-  // ── Per-bundle drilldown ──────────────────────────────────────────
-  lines.push('## Per-bundle (`.agent` files)');
-  lines.push('');
+      `| **Totals** | ${report.totalComplexity} | ${report.totalApexComplexity} | ${report.totalComplexity + report.totalApexComplexity} |`, ''
+  , '## Per-bundle (`.agent` files)', '');
   for (const f of report.files) {
-    lines.push(`### \`${f.path}\` — CC = ${f.fileComplexity}`);
-    lines.push('');
+    lines.push(`### \`${f.path}\` — CC = ${f.fileComplexity}`, '');
     if (f.procedures.length === 0) {
       lines.push('_(no procedure-bearing scopes)_');
     } else {
-      lines.push('| Scope | Procedure | CC | Contributors |');
-      lines.push('| --- | --- | ---: | --- |');
+      lines.push('| Scope | Procedure | CC | Contributors |', '| --- | --- | ---: | --- |');
       for (const p of f.procedures) {
         lines.push(
           `| ${escapeCell(p.scope)} | ${KIND_LABEL[p.kind]} | ${p.complexity} | ${escapeCell(breakdownProc(p.contributors))} |`,
         );
       }
     }
+
     lines.push('');
 
-    if (f.declarations.length) {
-      lines.push('**Action references**');
-      lines.push('');
-      lines.push('| Action | Target kind | Target | Uses |');
-      lines.push('| --- | --- | --- | ---: |');
+    if (f.declarations.length > 0) {
+      lines.push('**Action references**', '', '| Action | Target kind | Target | Uses |', '| --- | --- | --- | ---: |');
       const usage = countReferences(f);
       for (const d of f.declarations) {
         const used = usage.get(d.name) ?? 0;
@@ -83,51 +68,53 @@ export function renderMarkdown(report: AnalysisReport): string {
           `| \`${d.name}\` | ${d.targetKind} | ${d.target ?? '_n/a_'} | ${used} |`,
         );
       }
+
       const undeclared = listUndeclaredRefs(f);
-      if (undeclared.length) {
-        lines.push('');
-        lines.push('Referenced but not declared in-file: ' + undeclared.map(u => `\`${u}\``).join(', '));
+      if (undeclared.length > 0) {
+        lines.push(
+          '',
+          'Referenced but not declared in-file: ' + undeclared.map(u => `\`${u}\``).join(', '),
+        );
       }
+
       lines.push('');
     }
   }
 
   // ── Apex backing logic ────────────────────────────────────────────
-  if (report.apexClasses.length || report.unresolvedApexTargets.length) {
-    lines.push('## Apex backing logic');
-    lines.push('');
+  if (report.apexClasses.length > 0 || report.unresolvedApexTargets.length > 0) {
+    lines.push('## Apex backing logic', '');
     for (const cls of report.apexClasses) {
-      lines.push(`### \`${cls.path}\` — class CC = ${cls.classComplexity}`);
-      lines.push('');
-      lines.push(`Referenced by: ${cls.referencedBy.map(r => `\`${r}\``).join(', ') || '_none_'}`);
-      lines.push('');
+      lines.push(
+        `### \`${cls.path}\` — class CC = ${cls.classComplexity}`, '',
+        `Referenced by: ${cls.referencedBy.map(r => `\`${r}\``).join(', ') || '_none_'}`, '',
+      );
       if (cls.methods.length === 0) {
         lines.push('_(no methods with bodies)_');
       } else {
-        lines.push('| Method | CC | Contributors |');
-        lines.push('| --- | ---: | --- |');
+        lines.push('| Method | CC | Contributors |', '| --- | ---: | --- |');
         for (const m of cls.methods) {
           lines.push(
             `| \`${escapeCell(m.signature)}\` | ${m.complexity} | ${escapeCell(breakdownApex(m.contributors))} |`,
           );
         }
       }
+
       lines.push('');
     }
-    if (report.unresolvedApexTargets.length) {
-      lines.push('### Unresolved `apex://` targets');
-      lines.push('');
+
+    if (report.unresolvedApexTargets.length > 0) {
+      lines.push('### Unresolved `apex://` targets', '');
       for (const u of report.unresolvedApexTargets) {
         lines.push(`- \`${u}\` — no matching \`.cls\` under \`--source-dir\` or \`--apex-source\``);
       }
+
       lines.push('');
     }
   }
 
   // ── Footer ────────────────────────────────────────────────────────
-  lines.push('---');
-  lines.push('');
-  lines.push(
+  lines.push('---', '', 
     `Action declarations: **${report.totalDeclarations}** ` +
       `(apex ${report.byTargetKind.apex}, flow ${report.byTargetKind.flow}, ` +
       `prompt ${report.byTargetKind.prompt}, unknown ${report.byTargetKind.unknown}). ` +
@@ -206,43 +193,73 @@ function breakdownApex(contributors: ApexCCContributor[]): string {
 
 function shortKind(k: string): string {
   switch (k) {
-    case 'if_statement':
-      return 'if';
-    case 'elif_clause':
+    case 'elif_clause': {
       return 'elif';
-    case 'ternary_expression':
-      return 'ternary';
-    case 'short_circuit_and':
+    }
+
+    case 'if_statement': {
+      return 'if';
+    }
+
+    case 'short_circuit_and': {
       return 'and';
-    case 'short_circuit_or':
+    }
+
+    case 'short_circuit_or': {
       return 'or';
-    default:
+    }
+
+    case 'ternary_expression': {
+      return 'ternary';
+    }
+
+    default: {
       return k;
+    }
   }
 }
 
 function shortApexKind(k: string): string {
   switch (k) {
-    case 'if_statement':
-      return 'if';
-    case 'for_statement':
-      return 'for';
-    case 'while_statement':
-      return 'while';
-    case 'do_while_statement':
-      return 'do-while';
-    case 'when_arm':
-      return 'when';
-    case 'catch_clause':
+    case 'catch_clause': {
       return 'catch';
-    case 'ternary':
-      return 'ternary';
-    case 'short_circuit_and':
+    }
+
+    case 'do_while_statement': {
+      return 'do-while';
+    }
+
+    case 'for_statement': {
+      return 'for';
+    }
+
+    case 'if_statement': {
+      return 'if';
+    }
+
+    case 'short_circuit_and': {
       return '&&';
-    case 'short_circuit_or':
+    }
+
+    case 'short_circuit_or': {
       return '||';
-    default:
+    }
+
+    case 'ternary': {
+      return 'ternary';
+    }
+
+    case 'when_arm': {
+      return 'when';
+    }
+
+    case 'while_statement': {
+      return 'while';
+    }
+
+    default: {
       return k;
+    }
   }
 }
 
@@ -262,14 +279,17 @@ function listUndeclaredRefs(f: FileReport): string[] {
     seen.add(r.name);
     out.push(r.name);
   }
+
   return out;
 }
 
 function escapeCell(s: string): string {
   // GFM table cells: escape pipes and turn embedded newlines into <br>.
-  return s.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+  return s.replaceAll('|', String.raw`\|`).replaceAll('\n', '<br>');
 }
 
 // re-export for tree-shaking unused warnings; ApexClassReport is referenced
 // indirectly via report.apexClasses[number].
-export type { ApexClassReport };
+
+
+export {type ApexClassReport} from '../analyzer/types.js';

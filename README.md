@@ -170,25 +170,28 @@ The plugin uses ESM throughout and targets Node ≥ 20.
 
 ## Claude Code skill
 
-A Claude Code skill ships inside the repo at `.claude/skills/agentforcepmd/`
+The plugin ships with a bundled Claude Code skill (at `skill/` in the repo)
 that wraps the plugin from an adopter's point of view — discovery,
 install, upgrade, and output interpretation. It auto-triggers when a
 Claude session mentions `sf agentpmd`, "AgentScript cyclomatic
 complexity", or related phrases.
 
-**Activate the skill** (one of):
+**Activate the skill.** After installing the plugin, run:
 
 ```bash
-# Path A — pre-publication / development checkout. Recommended today.
-ln -sfn "$(pwd)/.claude/skills/agentforcepmd" ~/.claude/skills/agentforcepmd
+sf agentpmd install-skill
+```
 
-# Path B — after `sf plugins install sf-agentpmd` (post-publication).
-# The skill rides along inside the npm package.
-ln -sfn "$HOME/.local/share/sf/client/$(sf --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')/node_modules/sf-agentpmd/.claude/skills/agentforcepmd" \
-  ~/.claude/skills/agentforcepmd
+This recursively copies the bundled skill tree to
+`~/.claude/skills/agentforcepmd/`. Restart Claude Code (or reload skills)
+to activate it.
 
-# Path C — project-scoped (instead of user-global), peered with the repo:
-ln -sfn ../AgentForcePMD/.claude/skills/agentforcepmd .claude/skills/agentforcepmd
+Local-dev contributors can instead symlink the in-repo `skill/` directory
+(it moved from `.claude/skills/agentforcepmd/` to `skill/`) so edits show
+up live:
+
+```bash
+ln -sfn "$(pwd)/skill" ~/.claude/skills/agentforcepmd
 ```
 
 The skill's `SKILL.md` indexes four reference pages:

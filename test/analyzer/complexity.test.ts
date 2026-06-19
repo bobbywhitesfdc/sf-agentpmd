@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { expect } from 'chai';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parseAgentSource } from '../../src/analyzer/parse.js';
+import { fileURLToPath } from 'node:url';
+
 import { complexityForFile } from '../../src/analyzer/complexity.js';
+import { parseAgentSource } from '../../src/analyzer/parse.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = (name: string) => resolve(here, '..', 'fixtures', name);
@@ -15,8 +16,8 @@ describe('McCabe CC for AgentScript', () => {
     const cc = complexityForFile(root);
 
     // 4 scopes × 3 procedure kinds = 12 procedure CC entries
-    expect(cc.procedures).toHaveLength(12);
-    expect(cc.total).toBe(31);
+    expect(cc.procedures).to.have.lengthOf(12);
+    expect(cc.total).to.equal(31);
 
     // Spot-check a procedure with a short-circuit `and`
     const afterCustomerVerification = cc.procedures.find(
@@ -24,11 +25,11 @@ describe('McCabe CC for AgentScript', () => {
         p.scope === 'start_agent customer_verification' &&
         p.kind === 'after_reasoning',
     );
-    expect(afterCustomerVerification?.complexity).toBe(5);
+    expect(afterCustomerVerification?.complexity).to.equal(5);
     const andContribs = afterCustomerVerification!.contributors.filter(
       c => c.kind === 'short_circuit_and',
     );
-    expect(andContribs).toHaveLength(1);
+    expect(andContribs).to.have.lengthOf(1);
   });
 
   it('counts and/or short-circuit operators correctly', () => {
@@ -48,15 +49,15 @@ describe('McCabe CC for AgentScript', () => {
     //     if g:            → if=1
     //       set ...
     // Total contributors: 4 if + 1 and + 2 or = 7 → CC = 8
-    expect(before.contributors.filter(c => c.kind === 'if_statement')).toHaveLength(4);
-    expect(before.contributors.filter(c => c.kind === 'short_circuit_and')).toHaveLength(1);
-    expect(before.contributors.filter(c => c.kind === 'short_circuit_or')).toHaveLength(2);
-    expect(before.complexity).toBe(8);
+    expect(before.contributors.filter(c => c.kind === 'if_statement')).to.have.lengthOf(4);
+    expect(before.contributors.filter(c => c.kind === 'short_circuit_and')).to.have.lengthOf(1);
+    expect(before.contributors.filter(c => c.kind === 'short_circuit_or')).to.have.lengthOf(2);
+    expect(before.complexity).to.equal(8);
 
     const after = cc.procedures.find(p => p.kind === 'after_reasoning')!;
-    expect(after.complexity).toBe(2); // 1 if
+    expect(after.complexity).to.equal(2); // 1 if
 
     const reasoning = cc.procedures.find(p => p.kind === 'reasoning_instructions')!;
-    expect(reasoning.complexity).toBe(1); // pure template
+    expect(reasoning.complexity).to.equal(1); // pure template
   });
 });

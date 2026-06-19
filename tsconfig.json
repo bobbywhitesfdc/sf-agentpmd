@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "outDir": "lib",
+    "outDir": "dist",
     "rootDir": "src",
     "lib": ["ES2022"],
     "strict": true,
@@ -16,5 +16,8 @@
     "incremental": true
   },
   "include": ["src/**/*"],
-  "exclude": ["lib", "node_modules", "test", "vendor"]
+  "exclude": ["dist", "node_modules", "test", "vendor"],
+  "ts-node": {
+    "esm": true
+  }
 }

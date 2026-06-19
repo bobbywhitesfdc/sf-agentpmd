@@ -21,7 +21,7 @@ export function renderCsv(report: AnalysisReport): string {
       'start_col',
       'contributors',
     ]
-      .map(csvCell)
+      .map((c) => csvCell(c))
       .join(','),
   );
 
@@ -38,7 +38,7 @@ export function renderCsv(report: AnalysisReport): string {
           String(p.location.startCol),
           breakdownProc(p.contributors),
         ]
-          .map(csvCell)
+          .map((c) => csvCell(c))
           .join(','),
       );
     }
@@ -57,7 +57,7 @@ export function renderCsv(report: AnalysisReport): string {
           String(m.location.startCol),
           breakdownApex(m.contributors),
         ]
-          .map(csvCell)
+          .map((c) => csvCell(c))
           .join(','),
       );
     }
@@ -69,7 +69,7 @@ export function renderCsv(report: AnalysisReport): string {
 function csvCell(v: string): string {
   // Always quote — keeps the output uniform and lets cells contain
   // commas, quotes, and newlines without per-cell branching.
-  return `"${v.replace(/"/g, '""')}"`;
+  return `"${v.replaceAll('"', '""')}"`;
 }
 
 function breakdownProc(contributors: CCContributor[]): string {

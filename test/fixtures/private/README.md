@@ -39,17 +39,20 @@ outside the repo entirely:
 AGENTPMD_PRIVATE_FIXTURES=~/private-fixtures/agentforce npm test
 ```
 
-Specs that depend on private content use vitest's `describe.skipIf` so
-they're transparently skipped when the dir is empty (default CI
-behavior) and exercised locally when fixtures are present.
+Specs that depend on private content select `describe` vs `describe.skip`
+at load time so they're transparently skipped when the dir is empty
+(default CI behavior) and exercised locally when fixtures are present.
 
 ```ts
+import { expect } from 'chai';
 import { privateFixturesDir } from '../utils/private-fixtures.js';
 
-describe.skipIf(!privateFixturesDir())('private validation', () => {
+const describePrivate = privateFixturesDir() ? describe : describe.skip;
+
+describePrivate('private validation', () => {
   it('analyzes whatever is under test/fixtures/private/', async () => {
     const report = await analyzeSource(privateFixturesDir()!);
-    expect(report.files.length).toBeGreaterThan(0);
+    expect(report.files.length).to.be.greaterThan(0);
   });
 });
 ```

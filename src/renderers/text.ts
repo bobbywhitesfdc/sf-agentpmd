@@ -1,4 +1,5 @@
 import pc from 'picocolors';
+
 import type {
   AnalysisReport,
   ApexCCContributor,
@@ -8,11 +9,11 @@ import type {
 import type { RenderOptions } from './options.js';
 
 const KIND_LABEL: Record<ProcedureCC['kind'], string> = {
-  before_reasoning: 'before_reasoning',
   after_reasoning: 'after_reasoning',
-  reasoning_instructions: 'reasoning.instructions',
   available_when: 'available_when',
+  before_reasoning: 'before_reasoning',
   other: 'other',
+  reasoning_instructions: 'reasoning.instructions',
 };
 
 interface Glyphs {
@@ -37,19 +38,19 @@ const ASCII_GLYPHS: Glyphs = {
 };
 
 interface ResolvedOptions {
-  color: boolean;
   ascii: boolean;
+  color: boolean;
   width: number;
 }
 
 function resolveOptions(opts: RenderOptions | undefined): ResolvedOptions {
   // Auto-detect: text + emoji unless explicitly disabled, color on TTY only
   // and respecting the well-known NO_COLOR env var.
-  const stdoutIsTty = !!process.stdout.isTTY;
-  const noColorEnv = !!process.env.NO_COLOR;
+  const stdoutIsTty = Boolean(process.stdout.isTTY);
+  const noColorEnv = Boolean(process.env.NO_COLOR);
   return {
-    color: opts?.color ?? (stdoutIsTty && !noColorEnv),
     ascii: opts?.ascii ?? !stdoutIsTty,
+    color: opts?.color ?? (stdoutIsTty && !noColorEnv),
     width: opts?.width ?? 60,
   };
 }
@@ -60,8 +61,10 @@ export function renderText(report: AnalysisReport, opts?: RenderOptions): string
   const c = colorize(r.color);
   const lines: string[] = [];
 
-  lines.push(c.title('AgentForce PMD — Cyclomatic Complexity (McCabe)'));
-  lines.push(g.ruleHeavy.repeat(r.width));
+  lines.push(
+    c.title('AgentForce PMD — Cyclomatic Complexity (McCabe)'),
+    g.ruleHeavy.repeat(r.width),
+  );
 
   if (report.files.length === 0) {
     lines.push('  (no .agent files found)');
@@ -69,9 +72,11 @@ export function renderText(report: AnalysisReport, opts?: RenderOptions): string
   }
 
   for (const f of report.files) {
-    lines.push('');
-    lines.push(`${g.agentFile} ${c.path(f.path)}   CC=${c.cc(f.fileComplexity)}`);
-    lines.push(g.ruleLight.repeat(r.width));
+    lines.push(
+      '',
+      `${g.agentFile} ${c.path(f.path)}   CC=${c.cc(f.fileComplexity)}`,
+      g.ruleLight.repeat(r.width),
+    );
 
     if (f.procedures.length === 0) {
       lines.push('  (no procedure-bearing scopes)');
@@ -89,10 +94,12 @@ export function renderText(report: AnalysisReport, opts?: RenderOptions): string
       }
     }
 
-    if (f.declarations.length || f.references.length) {
-      lines.push('');
-      lines.push('  Action references');
-      lines.push('  ' + g.ruleLight.repeat(Math.max(0, r.width - 2)));
+    if (f.declarations.length > 0 || f.references.length > 0) {
+      lines.push(
+        '',
+        '  Action references',
+        '  ' + g.ruleLight.repeat(Math.max(0, r.width - 2)),
+      );
       const usage = countReferences(f);
       for (const d of f.declarations) {
         const used = usage.get(d.name) ?? 0;
@@ -101,10 +108,10 @@ export function renderText(report: AnalysisReport, opts?: RenderOptions): string
           `    ${pad(d.name, 32)} [${pad(d.targetKind, 6)}] used ${used}x → ${tgt}`,
         );
       }
+
       const undeclared = listUndeclaredRefs(f);
-      if (undeclared.length) {
-        lines.push('');
-        lines.push('    Referenced but not declared in-file:');
+      if (undeclared.length > 0) {
+        lines.push('', '    Referenced but not declared in-file:');
         for (const u of undeclared) {
           lines.push(`      ${u}`);
         }
@@ -112,15 +119,19 @@ export function renderText(report: AnalysisReport, opts?: RenderOptions): string
     }
   }
 
-  if (report.apexClasses.length || report.unresolvedApexTargets.length) {
-    lines.push('');
-    lines.push(c.title('Apex backing logic (resolved via apex:// targets)'));
-    lines.push(g.ruleHeavy.repeat(r.width));
+  if (report.apexClasses.length > 0 || report.unresolvedApexTargets.length > 0) {
+    lines.push(
+      '',
+      c.title('Apex backing logic (resolved via apex:// targets)'),
+      g.ruleHeavy.repeat(r.width),
+    );
     for (const cls of report.apexClasses) {
-      lines.push('');
-      lines.push(`${g.apexFile} ${c.path(cls.path)}   class CC=${c.cc(cls.classComplexity)}`);
-      lines.push(`   referenced by: ${cls.referencedBy.join(', ') || '(none)'}`);
-      lines.push(g.ruleLight.repeat(r.width));
+      lines.push(
+        '',
+        `${g.apexFile} ${c.path(cls.path)}   class CC=${c.cc(cls.classComplexity)}`,
+        `   referenced by: ${cls.referencedBy.join(', ') || '(none)'}`,
+        g.ruleLight.repeat(r.width),
+      );
       if (cls.methods.length === 0) {
         lines.push('   (no methods with bodies)');
       } else {
@@ -131,9 +142,9 @@ export function renderText(report: AnalysisReport, opts?: RenderOptions): string
         }
       }
     }
-    if (report.unresolvedApexTargets.length) {
-      lines.push('');
-      lines.push('Unresolved apex:// targets:');
+
+    if (report.unresolvedApexTargets.length > 0) {
+      lines.push('', 'Unresolved apex:// targets:');
       for (const u of report.unresolvedApexTargets) {
         lines.push(
           `  - ${u}  (no matching .cls under source-dir or --apex-source)`,
@@ -142,47 +153,43 @@ export function renderText(report: AnalysisReport, opts?: RenderOptions): string
     }
   }
 
-  lines.push('');
-  lines.push(g.ruleHeavy.repeat(r.width));
-  lines.push(c.title('CC by location (whitepaper § 7)'));
   lines.push(
+    '',
+    g.ruleHeavy.repeat(r.width),
+    c.title('CC by location (whitepaper § 7)'),
     `  AgentScript: ${c.cc(report.totalComplexity)}` +
       `   Apex: ${c.cc(report.totalApexComplexity)}` +
       `   Combined: ${c.cc(report.totalComplexity + report.totalApexComplexity)}`,
-  );
-  lines.push(
     `Action declarations: ${report.totalDeclarations}  ` +
       `(apex ${report.byTargetKind.apex}, flow ${report.byTargetKind.flow}, ` +
-      `prompt ${report.byTargetKind.prompt}, unknown ${report.byTargetKind.unknown})`,
+      `prompt ${report.byTargetKind.prompt}, unknown ${report.byTargetKind.unknown})`, `Action references:   ${report.totalReferences}`
+  
   );
-  lines.push(`Action references:   ${report.totalReferences}`);
   return lines.join('\n');
 }
 
 interface Colorizer {
-  title: (s: string) => string;
-  path: (s: string) => string;
-  scope: (s: string) => string;
   breakdown: (s: string) => string;
   cc: (n: number) => string;
+  path: (s: string) => string;
+  scope: (s: string) => string;
+  title: (s: string) => string;
 }
 
 function colorize(on: boolean): Colorizer {
   if (!on) {
     return {
-      title: s => s,
+      breakdown: s => s,
+      cc: String,
       path: s => s,
       scope: s => s,
-      breakdown: s => s,
-      cc: n => String(n),
+      title: s => s,
     };
   }
+
   return {
-    title: pc.bold,
-    path: pc.cyan,
-    scope: pc.bold,
     breakdown: pc.gray,
-    cc: (n: number) => {
+    cc(n: number) {
       // Palette echoes whitepaper temperature: cool for low, hot for high.
       const s = String(n);
       if (n >= 20) return pc.red(s);
@@ -190,6 +197,9 @@ function colorize(on: boolean): Colorizer {
       if (n >= 5) return pc.green(s);
       return pc.gray(s);
     },
+    path: pc.cyan,
+    scope: pc.bold,
+    title: pc.bold,
   };
 }
 
@@ -213,43 +223,73 @@ function breakdownApex(contributors: ApexCCContributor[]): string {
 
 function shortKind(k: string): string {
   switch (k) {
-    case 'if_statement':
-      return 'if';
-    case 'elif_clause':
+    case 'elif_clause': {
       return 'elif';
-    case 'ternary_expression':
-      return 'ternary';
-    case 'short_circuit_and':
+    }
+
+    case 'if_statement': {
+      return 'if';
+    }
+
+    case 'short_circuit_and': {
       return 'and';
-    case 'short_circuit_or':
+    }
+
+    case 'short_circuit_or': {
       return 'or';
-    default:
+    }
+
+    case 'ternary_expression': {
+      return 'ternary';
+    }
+
+    default: {
       return k;
+    }
   }
 }
 
 function shortApexKind(k: string): string {
   switch (k) {
-    case 'if_statement':
-      return 'if';
-    case 'for_statement':
-      return 'for';
-    case 'while_statement':
-      return 'while';
-    case 'do_while_statement':
-      return 'do-while';
-    case 'when_arm':
-      return 'when';
-    case 'catch_clause':
+    case 'catch_clause': {
       return 'catch';
-    case 'ternary':
-      return 'ternary';
-    case 'short_circuit_and':
+    }
+
+    case 'do_while_statement': {
+      return 'do-while';
+    }
+
+    case 'for_statement': {
+      return 'for';
+    }
+
+    case 'if_statement': {
+      return 'if';
+    }
+
+    case 'short_circuit_and': {
       return '&&';
-    case 'short_circuit_or':
+    }
+
+    case 'short_circuit_or': {
       return '||';
-    default:
+    }
+
+    case 'ternary': {
+      return 'ternary';
+    }
+
+    case 'when_arm': {
+      return 'when';
+    }
+
+    case 'while_statement': {
+      return 'while';
+    }
+
+    default: {
       return k;
+    }
   }
 }
 
@@ -261,8 +301,10 @@ function groupByScope(procs: ProcedureCC[]): Map<string, ProcedureCC[]> {
       arr = [];
       m.set(p.scope, arr);
     }
+
     arr.push(p);
   }
+
   return m;
 }
 
@@ -287,5 +329,6 @@ function listUndeclaredRefs(f: FileReport): string[] {
     seen.add(r.name);
     out.push(r.name);
   }
+
   return out;
 }

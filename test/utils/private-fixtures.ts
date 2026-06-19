@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PRIVATE_DIR = resolve(here, '..', 'fixtures', 'private');

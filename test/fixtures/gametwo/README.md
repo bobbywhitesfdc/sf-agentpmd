@@ -1,7 +1,8 @@
 # GameTwo fixtures
 
-Trimmed snapshot from `~/projects/ArcFlareProductDefinition/spikes/gametwo`
-(the posture-comparison spike that produced the v2 LOC categorization rule).
+Trimmed snapshot from a private posture-comparison spike (the work that
+produced the v2 LOC categorization rule). Source paths are local-only; the
+files below are committed copies so the repo stays self-contained.
 
 We mirror only what `sf agentpmd` exercises:
 
@@ -16,10 +17,6 @@ We mirror only what `sf agentpmd` exercises:
   Apex-CC walker; not exercised by the v1 tests.
 
 These files are copies, not symlinks, so the repo stays self-contained.
-Resync from the spike with:
-
-```
-cp ~/projects/ArcFlareProductDefinition/spikes/gametwo/force-app/main/default/aiAuthoringBundles/GameTwo_Simple/GameTwo_Simple.agent \
-   test/fixtures/gametwo/aiAuthoringBundles/GameTwo_Simple/
-# (and so on for the other three files)
-```
+Resync from the source spike by copying the four files
+(`GameTwo_Simple.agent`, `GameTwo_Out_Simple.agent`, `GameTwo_RandomChoice.cls`,
+`GameTwo_PlayRound.cls`) back into the matching subdirectories here.

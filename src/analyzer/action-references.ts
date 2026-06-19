@@ -1,18 +1,18 @@
 import type { SyntaxNode } from '@agentscript/types';
+
+import type { AgentScope } from './complexity.js';
 import type { ActionDeclaration, ActionReference, ActionTargetKind } from './types.js';
+
 import {
-  bodyOf,
   descendants,
   extractStringLiteral,
   findMappingEntry,
-  keyHeader,
   locOf,
   mappingKeyHeader,
   mappingValue,
 } from './parse.js';
-import type { AgentScope } from './complexity.js';
 
-const TARGET_SCHEME = /^([a-z][a-z0-9+.\-]*):\/\//i;
+const TARGET_SCHEME = /^([a-z][a-z0-9+.-]*):\/\//i;
 
 function classifyTarget(uri: string | undefined): ActionTargetKind {
   if (!uri) return 'unknown';
@@ -43,31 +43,27 @@ export function collectDeclarations(scope: AgentScope): ActionDeclaration[] {
     const declBody = mappingValue(child);
     if (!declBody) {
       decls.push({
+        location: locOf(child),
         name: declName,
         scope: scope.label,
         target: undefined,
         targetKind: 'unknown',
-        location: locOf(child),
       });
       continue;
     }
+
     const targetVal = findMappingEntry(declBody, 'target');
     const targetStr = targetVal ? extractStringLiteral(targetVal) : undefined;
     decls.push({
+      location: locOf(child),
       name: declName,
       scope: scope.label,
       target: targetStr,
       targetKind: classifyTarget(targetStr),
-      location: locOf(child),
     });
   }
-  return decls;
-}
 
-interface ScopedNode {
-  node: SyntaxNode;
-  scope: AgentScope;
-  context: ActionReference['context'];
+  return decls;
 }
 
 /**
@@ -97,10 +93,10 @@ export function collectReferences(scope: AgentScope): ActionReference[] {
       // Differentiate when we're inside a transition_statement.
       const ctx = isInsideTransition(n) ? 'transition' : context;
       refs.push({
-        name,
-        scope: scope.label,
         context: ctx,
         location: locOf(n),
+        name,
+        scope: scope.label,
       });
     }
   };
@@ -125,7 +121,7 @@ function actionNameFromMember(n: SyntaxNode): string | undefined {
   // member_expression text is "@actions.Foo_Bar" — strip the prefix.
   const t = n.text;
   const dot = t.indexOf('.');
-  if (dot < 0) return undefined;
+  if (dot === -1) return undefined;
   const rest = t.slice(dot + 1);
   // Take the leading identifier, in case of further chained access.
   const m = /^([A-Za-z_][A-Za-z0-9_]*)/.exec(rest);
@@ -138,5 +134,6 @@ function isInsideTransition(n: SyntaxNode): boolean {
     if (p.type === 'transition_statement') return true;
     p = p.parent;
   }
+
   return false;
 }

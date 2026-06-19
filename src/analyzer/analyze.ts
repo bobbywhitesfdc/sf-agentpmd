@@ -1,27 +1,22 @@
-import { readFile } from 'node:fs/promises';
-import { readdir, stat } from 'node:fs/promises';
+import { readdir , readFile, stat } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
+
 import type {
   ActionDeclaration,
   ActionReference,
   ActionTargetKind,
   AnalysisReport,
   FileReport,
-  ProcedureCC,
 } from './types.js';
-import { extractDeveloperName, parseAgentSource } from './parse.js';
-import { collectScopes, complexityForFile } from './complexity.js';
+
 import { collectDeclarations, collectReferences } from './action-references.js';
 import { analyzeReferencedApex } from './apex-analyze.js';
+import { collectScopes, complexityForFile } from './complexity.js';
+import { extractDeveloperName, parseAgentSource } from './parse.js';
 
 export interface AnalyzeOptions {
   /** Override location for apex:// resolution. Optional. */
   apexSourceOverride?: string;
-  /**
-   * Base directory for relative paths in the report. Defaults to the source
-   * root (or, when multiple roots are supplied, the longest common ancestor).
-   */
-  reportBase?: string;
   /**
    * Filter to specific agent bundles by API name. Each entry is matched
    * against (a) the bundle directory name and (b) `config.developer_name`
@@ -29,10 +24,17 @@ export interface AnalyzeOptions {
    * are analyzed.
    */
   apiNames?: string[];
+  /**
+   * Base directory for relative paths in the report. Defaults to the source
+   * root (or, when multiple roots are supplied, the longest common ancestor).
+   */
+  reportBase?: string;
 }
 
-/** Error thrown when --api-name filters produce no matches. Carries the
- * candidate list so callers can show a useful hint. */
+/**
+ * Error thrown when --api-name filters produce no matches. Carries the
+ * candidate list so callers can show a useful hint.
+ */
 export class NoMatchingBundlesError extends Error {
   constructor(
     public readonly requested: string[],
@@ -40,25 +42,26 @@ export class NoMatchingBundlesError extends Error {
   ) {
     super(
       `No agent bundle matched ${requested.map(n => `'${n}'`).join(', ')}. ` +
-        `Available: ${available.map(formatBundleIdentity).join(', ')}`,
+        `Available: ${available.map((b) => formatBundleIdentity(b)).join(', ')}`,
     );
     this.name = 'NoMatchingBundlesError';
   }
 }
 
 export interface BundleIdentity {
-  /** Absolute path of the .agent file. */
-  path: string;
-  /** The bundle's directory name (parent of the .agent file). */
-  dirName: string;
   /** The config.developer_name value, if present. */
   developerName: string | undefined;
+  /** The bundle's directory name (parent of the .agent file). */
+  dirName: string;
+  /** Absolute path of the .agent file. */
+  path: string;
 }
 
 function formatBundleIdentity(b: BundleIdentity): string {
   if (b.developerName && b.developerName !== b.dirName) {
     return `${b.developerName} (dir: ${b.dirName})`;
   }
+
   return b.dirName;
 }
 
@@ -79,6 +82,7 @@ export async function analyzeSource(
   if (rawRoots.length === 0) {
     throw new Error('analyzeSource requires at least one source path');
   }
+
   const absRoots = rawRoots.map(p => resolve(p));
   const reportBase = options.reportBase
     ? resolve(options.reportBase)
@@ -91,6 +95,7 @@ export async function analyzeSource(
     const files = await findAgentFiles(root);
     for (const f of files) if (!allFiles.includes(f)) allFiles.push(f);
   }
+
   allFiles.sort();
 
   const filteredFiles = await filterByApiNames(allFiles, options.apiNames);
@@ -101,20 +106,20 @@ export async function analyzeSource(
   }
 
   const apex = await analyzeReferencedApex({
+    agentAbsPaths: filteredFiles,
+    apexSourceOverride: options.apexSourceOverride,
     fileReports,
     sourceDirRoot: reportBase,
-    apexSourceOverride: options.apexSourceOverride,
-    agentAbsPaths: filteredFiles,
   });
 
   const report: AnalysisReport = {
+    apexClasses: apex.classes,
+    byTargetKind: tallyTargets(fileReports),
     files: fileReports,
+    totalApexComplexity: apex.classes.reduce((acc, c) => acc + c.classComplexity, 0),
     totalComplexity: fileReports.reduce((acc, f) => acc + f.fileComplexity, 0),
     totalDeclarations: fileReports.reduce((acc, f) => acc + f.declarations.length, 0),
     totalReferences: fileReports.reduce((acc, f) => acc + f.references.length, 0),
-    byTargetKind: tallyTargets(fileReports),
-    apexClasses: apex.classes,
-    totalApexComplexity: apex.classes.reduce((acc, c) => acc + c.classComplexity, 0),
     unresolvedApexTargets: apex.unresolved,
   };
   return report;
@@ -125,7 +130,7 @@ export async function analyzeFile(absPath: string, base: string): Promise<FileRe
   const root = parseAgentSource(source);
 
   const cc = complexityForFile(root);
-  const procedures: ProcedureCC[] = cc.procedures;
+  const {procedures} = cc;
 
   const scopes = collectScopes(root);
   const declarations: ActionDeclaration[] = [];
@@ -136,17 +141,17 @@ export async function analyzeFile(absPath: string, base: string): Promise<FileRe
   }
 
   return {
+    declarations,
+    fileComplexity: cc.total,
+    parseErrors: [], // CST is error-tolerant; surface diagnostics in a later iteration.
     path: relative(base, absPath),
     procedures,
-    fileComplexity: cc.total,
-    declarations,
     references,
-    parseErrors: [], // CST is error-tolerant; surface diagnostics in a later iteration.
   };
 }
 
 async function findAgentFiles(root: string): Promise<string[]> {
-  const s = await stat(root).catch(() => undefined);
+  const s = await stat(root).catch(() => {});
   if (!s) throw new Error(`source path does not exist: ${root}`);
   if (s.isFile()) return root.endsWith('.agent') ? [root] : [];
 
@@ -161,6 +166,7 @@ async function findAgentFiles(root: string): Promise<string[]> {
       else if (e.isFile() && e.name.endsWith('.agent')) out.push(full);
     }
   };
+
   await visit(root);
   out.sort();
   return out;
@@ -171,8 +177,8 @@ function tallyTargets(files: FileReport[]): Record<ActionTargetKind, number> {
     apex: 0,
     flow: 0,
     prompt: 0,
-    utils: 0,
     unknown: 0,
+    utils: 0,
   };
   for (const f of files) for (const d of f.declarations) acc[d.targetKind]++;
   return acc;
@@ -215,7 +221,7 @@ async function filterByApiNames(
   for (const file of unmatched) {
     const dirName = basename(dirname(file));
     const developerName = await readDeveloperName(file);
-    identities.push({ path: file, dirName, developerName });
+    identities.push({ developerName, dirName, path: file });
     if (developerName && wanted.has(developerName)) {
       matches.push(file);
     }
@@ -231,12 +237,13 @@ async function filterByApiNames(
         all.push(existing);
       } else {
         all.push({
-          path: file,
-          dirName: basename(dirname(file)),
           developerName: await readDeveloperName(file),
+          dirName: basename(dirname(file)),
+          path: file,
         });
       }
     }
+
     all.sort((a, b) => a.dirName.localeCompare(b.dirName));
     throw new NoMatchingBundlesError(apiNames, all);
   }
@@ -262,6 +269,7 @@ function longestCommonAncestor(paths: string[]): string {
     if (split.every(s => s[i] === seg)) common.push(seg);
     else break;
   }
+
   const joined = common.join('/') || '/';
   return joined;
 }

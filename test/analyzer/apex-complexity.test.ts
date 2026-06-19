@@ -1,12 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { expect } from 'chai';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parseApexSource } from '../../src/analyzer/apex-parse.js';
+import { fileURLToPath } from 'node:url';
+
 import {
   complexityOfMethod,
   methodsInCompilationUnit,
 } from '../../src/analyzer/apex-complexity.js';
+import { parseApexSource } from '../../src/analyzer/apex-parse.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (rel: string) =>
@@ -19,6 +20,7 @@ function methodCCs(clsPath: string): Record<string, number> {
     const cc = complexityOfMethod(m);
     out[cc.name] = cc.complexity;
   }
+
   return out;
 }
 
@@ -30,11 +32,11 @@ describe('Apex McCabe CC walker', () => {
     //   (+1 ternary, +1 ||) + inside-loop ternary
     //   `(requests != null && i < requests.size() && requests[i] != null)
     //    ? requests[i].cacheBuster : null` (+1 ternary, +2 &&) = 7 → CC 8
-    expect(ccs.execute).toBe(8);
+    expect(ccs.execute).to.equal(8);
     // freshCookie: no control flow → CC 1
-    expect(ccs.freshCookie).toBe(1);
+    expect(ccs.freshCookie).to.equal(1);
     // abbreviate: 2 ifs → CC 3
-    expect(ccs.abbreviate).toBe(3);
+    expect(ccs.abbreviate).to.equal(3);
   });
 
   it('matches hand-counted CC for GameTwo_PlayRound.cls', () => {
@@ -42,12 +44,12 @@ describe('Apex McCabe CC walker', () => {
     // execute: try/catch (+1) + for-loop (+1) + 2 ternaries (+2)
     //   `(requests == null) ? 0 : ...` and
     //   `(r.errorMessage == null ? '' : ' err=' + ...)` = 4 → CC 5
-    expect(ccs.execute).toBe(5);
+    expect(ccs.execute).to.equal(5);
     // playOne: 1 ternary + 1 if (invalid choice guard) + 1 if (player == agent)
     //   + 1 else-if (win-compound) which is 1 if + 3 && + 2 || = 9 → CC 10
-    expect(ccs.playOne).toBe(10);
+    expect(ccs.playOne).to.equal(10);
     // parseCount: 1 if + 1 catch = 2 → CC 3
-    expect(ccs.parseCount).toBe(3);
+    expect(ccs.parseCount).to.equal(3);
   });
 
   it('renders formal parameter signatures with whitespace between type and id', () => {
@@ -56,13 +58,13 @@ describe('Apex McCabe CC walker', () => {
     const cu = parseApexSource(
       readFileSync(fixture('classes/GameTwo_PlayRound.cls'), 'utf8'),
     );
-    const methods = methodsInCompilationUnit(cu).map(complexityOfMethod);
+    const methods = methodsInCompilationUnit(cu).map((m) => complexityOfMethod(m));
     const execute = methods.find(m => m.name === 'execute')!;
-    expect(execute.signature).toBe('List<Result> execute(List<Request> requests)');
+    expect(execute.signature).to.equal('List<Result> execute(List<Request> requests)');
     const playOne = methods.find(m => m.name === 'playOne')!;
-    expect(playOne.signature).toBe('Result playOne(Request req)');
+    expect(playOne.signature).to.equal('Result playOne(Request req)');
     const parseCount = methods.find(m => m.name === 'parseCount')!;
-    expect(parseCount.signature).toBe('Integer parseCount(String s)');
+    expect(parseCount.signature).to.equal('Integer parseCount(String s)');
   });
 
   it('skips when-else arms and does not count else/finally/try', () => {
@@ -86,11 +88,11 @@ describe('Apex McCabe CC walker', () => {
     `;
     const cu = parseApexSource(source);
     const methods = methodsInCompilationUnit(cu);
-    expect(methods).toHaveLength(1);
+    expect(methods).to.have.lengthOf(1);
     const cc = complexityOfMethod(methods[0]);
     // 2 explicit when arms (not the when-else) + 1 catch = 3 contributors
-    expect(cc.complexity).toBe(4);
-    expect(cc.contributors.filter(c => c.kind === 'when_arm')).toHaveLength(2);
-    expect(cc.contributors.filter(c => c.kind === 'catch_clause')).toHaveLength(1);
+    expect(cc.complexity).to.equal(4);
+    expect(cc.contributors.filter(c => c.kind === 'when_arm')).to.have.lengthOf(2);
+    expect(cc.contributors.filter(c => c.kind === 'catch_clause')).to.have.lengthOf(1);
   });
 });

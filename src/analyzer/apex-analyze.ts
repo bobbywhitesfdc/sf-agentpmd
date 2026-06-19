@@ -1,12 +1,14 @@
 import { readFile } from 'node:fs/promises';
-import { relative, basename } from 'node:path';
+import { basename, relative } from 'node:path';
+
 import type {
   ApexClassReport,
   ApexMethodCC,
   FileReport,
 } from './types.js';
-import { parseApexSource } from './apex-parse.js';
+
 import { complexityOfMethod, methodsInCompilationUnit } from './apex-complexity.js';
+import { parseApexSource } from './apex-parse.js';
 import {
   extractApexClassName,
   resolveApexClassPath,
@@ -14,11 +16,11 @@ import {
 
 /** Inputs needed to resolve and analyze every apex:// target in the bundle. */
 export interface ApexAnalyzeInputs {
-  fileReports: FileReport[];
-  sourceDirRoot: string;
-  apexSourceOverride?: string;
   /** Absolute paths of every .agent file analyzed, parallel to fileReports. */
   agentAbsPaths: string[];
+  apexSourceOverride?: string;
+  fileReports: FileReport[];
+  sourceDirRoot: string;
 }
 
 export interface ApexAnalyzeOutputs {
@@ -42,10 +44,11 @@ export async function analyzeReferencedApex(
         unresolved.add(decl.target);
         continue;
       }
+
       const path = await resolveApexClassPath(className, {
         agentFilePath: agentAbs,
-        sourceDirRoot: inputs.sourceDirRoot,
         apexSourceOverride: inputs.apexSourceOverride,
+        sourceDirRoot: inputs.sourceDirRoot,
       });
       if (!path) {
         unresolved.add(decl.target);
@@ -57,6 +60,7 @@ export async function analyzeReferencedApex(
         if (!existing.referencedBy.includes(fr.path)) {
           existing.referencedBy.push(fr.path);
         }
+
         continue;
       }
 
@@ -66,8 +70,8 @@ export async function analyzeReferencedApex(
   }
 
   return {
-    classes: Array.from(byPath.values()).sort((a, b) => a.className.localeCompare(b.className)),
-    unresolved: Array.from(unresolved).sort(),
+    classes: [...byPath.values()].sort((a, b) => a.className.localeCompare(b.className)),
+    unresolved: [...unresolved].sort(),
   };
 }
 
@@ -80,15 +84,15 @@ async function analyzeApexClass(
   const source = await readFile(absPath, 'utf8');
   const cu = parseApexSource(source);
   const methodCtxs = methodsInCompilationUnit(cu);
-  const methods: ApexMethodCC[] = methodCtxs.map(complexityOfMethod);
+  const methods: ApexMethodCC[] = methodCtxs.map((m) => complexityOfMethod(m));
   const classComplexity = methods.reduce((acc, m) => acc + m.complexity, 0);
 
   return {
+    classComplexity,
     className: className || basename(absPath, '.cls'),
+    methods,
+    parseErrors: [],
     path: relative(sourceDirRoot, absPath),
     referencedBy,
-    methods,
-    classComplexity,
-    parseErrors: [],
   };
 }

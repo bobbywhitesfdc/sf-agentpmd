@@ -56,7 +56,7 @@ Use whenever producing measurements that compare:
 - An agent against a reference architecture
 - Multiple candidate designs during architectural decision-making
 
-Use whenever the measurement will appear in an artifact intended to be read by people outside the ArcFlare team — whitepapers, blog posts, customer-facing comparisons, LinkedIn long-form articles, analyst briefings.
+Use whenever the measurement will appear in an artifact intended to be read by an external audience — whitepapers, blog posts, customer-facing comparisons, LinkedIn long-form articles, analyst briefings.
 
 Do NOT use this skill for:
 
@@ -96,7 +96,7 @@ The four categories sit on a risk gradient. Visualizations should reinforce this
 
 ### Canonical color palette
 
-For all ArcFlare visualizations:
+For all visualizations:
 
 | Category | Hex | Description |
 |---|---|---|
@@ -292,7 +292,7 @@ Anticipated revision paths beyond v2.0:
 - **Flow incorporation** (see § 9).
 - **Test code categorization.** If test code is included in future measurements, it likely warrants its own category or sub-categorization within scaffolding.
 
-Rule revisions are versioned. Any change bumps the version. Artifacts citing this rule should cite the version (e.g., "categorized per ArcFlare LOC Rule v2.0").
+Rule revisions are versioned. Any change bumps the version. Artifacts citing this rule should cite the version (e.g., "categorized per AgentForcePMD LOC Rule v2.0").
 
 ---
 

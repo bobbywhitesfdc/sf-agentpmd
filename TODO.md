@@ -1,126 +1,42 @@
 # TODO
 
-## Decision: publish to npm now, or polish more first?
+## Status
 
-The plugin is functionally complete enough to be useful (CC + action references
-for AgentScript, follow-through to Apex CC, four output formats, sfdx-project
-autodetection, `--api-name` filter, 29 passing tests). Whether to publish now
-is a timing call.
+The plugin is published to npm as the unscoped **`sf-agentpmd`** and its
+conventions are aligned with the sibling plugin `sf-bulk-analyzer`
+(oclif scaffold, `dist/` build output, eslint + prettier + mocha/chai,
+`@oclif/plugin-help`, a bundled Claude Code skill installed via
+`sf agentpmd install-skill`).
 
-**Reasons to publish soon**
-- Teammates / external users can `sf plugins install` instead of `git clone`.
-- Surfaces real-world feedback before the API stabilizes.
-- Establishes the package name on npm before someone else claims it.
+Releases are automated via GitHub Actions:
 
-**Reasons to wait**
-- v3 (four-category LOC categorizer, per `docs/agent-loc-categorization-skill-v2.md`)
-  is still unimplemented. A pre-v3 publish means a v0.x → v0.next bump shortly after.
-- The "publishable" prep itself (below) is a half-day of mechanical work that's
-  cheaper to do once, when we're sure we want it.
-- Plugin name once published is awkward to change.
-- No real consumers asking for an npm install path yet.
+- `.github/workflows/test.yml` — lint + build + test on every non-main push.
+- `.github/workflows/onPushToMain.yml` — on push to `main`, if
+  `package.json` `version` has no matching `vX.Y.Z` release yet, regenerates
+  the oclif README, tags, and creates a GitHub Release.
+- `.github/workflows/onRelease.yml` — on a published Release, builds and
+  runs `npm publish` using the `NPM_TOKEN` repo secret.
 
----
+**To cut a release:** bump `version` in `package.json`, push to `main`
+(the workflow chain tags → releases → publishes). Keep the
+`pluginVersion()` string in `src/renderers/sarif.ts` in sync with the
+package version.
 
-## Phase 1 — Pre-publish prep (when ready)
-
-### 1. Pick a name
-- [ ] `@bobbywhitesfdc/sf-agentpmd` (scoped — **recommended**) vs `sf-agentpmd` (unscoped)
-- Both names are currently free on npm (verified 2026-05-18).
-- Scoped avoids reading as an official Salesforce plugin and reserves the
-  namespace; install command becomes `sf plugins install @bobbywhitesfdc/sf-agentpmd`.
-- Whichever you pick, update `"name"` in `package.json`.
-
-### 2. Add publish-required metadata to `package.json`
-- [ ] `"author"` field
-- [ ] `"repository": { "type": "git", "url": "..." }`
-- [ ] `"bugs": { "url": "..." }`
-- [ ] `"homepage"`
-- [ ] `"keywords"` (salesforce, sf-plugin, oclif, agentforce, agentscript,
-      cyclomatic-complexity, pmd, static-analysis, …)
-
-### 3. Fix the `files` whitelist — **the real blocker**
-Current state (partial; `/.claude/skills` was added when the skill
-landed):
-```json
-"files": ["/lib", "/messages", "/oclif.manifest.json", "/.claude/skills"]
-```
-This still silently omits `bin/` (so the `"bin": "./bin/run.js"` entry
-points nowhere) and `vendor/` (so `file:./vendor/agentscript-*` deps
-resolve to empty dirs). Published as-is the plugin installs but does
-not run.
-
-Needs to be:
-```json
-"files": ["/lib", "/bin", "/vendor", "/messages", "/oclif.manifest.json", "/.claude/skills", "/LICENSE", "/NOTICE"]
-```
-- [ ] Add `/bin`, `/vendor`, `/LICENSE`, `/NOTICE` to `files`.
-- [ ] Verify via `npm pack --dry-run` that all expected entries appear
-      — including the `.claude/skills/agentforcepmd/` tree.
-
-### 4. Apache-2.0 attribution for vendored AgentScript
-- [ ] Add `LICENSE` (copy from upstream `agentscript/LICENSE.txt`).
-- [ ] Add `NOTICE` crediting `salesforce/agentscript` and listing the
-      vendored paths (`vendor/agentscript-types/`,
-      `vendor/agentscript-parser-javascript/`).
-
-### 5. Generate `oclif.manifest.json` at pack time
-- [ ] `npm install --save-dev oclif`
-- [ ] Add `prepack` script: `npm run clean && npm run build && oclif manifest`
-- [ ] Add `postpack` script: `rm -f oclif.manifest.json`
-
-### 6. Fix the SARIF `informationUri`
-- [ ] `src/renderers/sarif.ts` currently points at the placeholder
-      `https://github.com/anthropics/AgentForcePMD`. Repoint to the real
-      GitHub URL before publish — SARIF consumers (GitHub Code Scanning)
-      hyperlink that value.
+Required repo secrets: `NPM_TOKEN` (npm automation token). For the
+auto-release-on-version-bump chain to fire `onRelease`, `onPushToMain`
+also needs a PAT in `GH_TOKEN` (plus `GH_EMAIL` / `GH_USERNAME`) —
+releases created with the default `GITHUB_TOKEN` do not trigger the
+publish workflow. A release created manually with `gh release create`
+(local PAT) triggers `onRelease` without those extra secrets.
 
 ---
 
-## Phase 2 — Pre-flight test (before `npm publish`)
-- [ ] `npm pack` — produce a real tarball.
-- [ ] `tar tzf sf-agentpmd-*.tgz | sort` — eyeball the contents.
-- [ ] `sf plugins unlink sf-agentpmd` — drop the dev link.
-- [ ] `sf plugins install $(pwd)/sf-agentpmd-*.tgz` — install as an end user.
-- [ ] `cd ~/projects/ArcFlareProductDefinition/spikes/gametwo && sf agentpmd analyze` — full smoke test.
-- [ ] Repeat if anything's missing from the tarball.
-
----
-
-## Phase 3 — First publish (touches credentials, manual step)
-```bash
-npm login                                  # one-time
-npm whoami                                 # confirm
-npm publish --access public                # scoped first publish needs --access public
-npm view sf-agentpmd                       # confirm it's live
-sf plugins install sf-agentpmd             # end-user install path
-```
-
----
-
-## Phase 4 — Subsequent publishes
-- `npm version {patch|minor|major}` bumps package.json + creates a git tag.
-- `git push --follow-tags`
-- `npm publish`
-- End users update via `sf plugins update`.
-
----
-
-## Phase 5 — CI automation (later)
-- GitHub Actions workflow on tag push.
-- `npm ci && npm test && npm run build && npm publish --access public`.
-- `NODE_AUTH_TOKEN` from an npm automation token stored in repo secrets.
-
----
-
-## Other polish candidates (not blocking publish)
-
-These came up during build-out and are deferred:
+## Roadmap — deferred features
 
 - **Multi-format agent analysis** (`bots/`, `genAiPlannerBundles/`). The
   current plugin only sees one of three coordinated layers that make up a
-  Salesforce agent. Surfaced by `myAgentSpike` where the .agent file is
-  near-empty (CC ≈ 1 per topic) but the real implementation lives in
+  Salesforce agent. Surfaced where the `.agent` file is near-empty
+  (CC ≈ 1 per topic) but the real implementation lives in
   `genAiPlannerBundles/<Name>/plannerActions/*.xml` and
   `bots/<Name>/v*.botVersion-meta.xml`. To be useful as an org-wide review
   tool we need:
@@ -191,8 +107,11 @@ These came up during build-out and are deferred:
   `--sarif-warning`, `--sarif-error`.
 - **Flow incorporation**. Per whitepaper § 9; deferred until a CC analog
   for Flow elements is settled.
-- **Source-map fix for vendored agentscript-parser-javascript**. Vitest
-  emits sourcemap warnings ("Sourcemap … points to missing source files")
-  because we copied `dist/*.js.map` but not the original `src/`. Either
-  strip the `.js.map` files from `vendor/` or copy `src/` too. Cosmetic,
-  not blocking.
+- **`renderText` complexity**. The text renderer trips the eslint
+  `complexity` warning (CC 22 > 20) — ironic for a complexity tool.
+  Refactor into smaller section helpers.
+- **Source-map fix for vendored agentscript-parser-javascript**. Mocha/
+  ts-node may emit sourcemap warnings ("Sourcemap … points to missing
+  source files") because we copied `dist/*.js.map` but not the original
+  `src/`. Either strip the `.js.map` files from `vendor/` or copy `src/`
+  too. Cosmetic, not blocking.

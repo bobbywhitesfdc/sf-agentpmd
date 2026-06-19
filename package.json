@@ -1,6 +1,6 @@
 {
   "name": "sf-agentpmd",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "SF CLI plugin: McCabe cyclomatic complexity and Agent LOC analysis for AgentScript (.agent) bundles.",
   "license": "MIT",
   "author": "Bobby White",

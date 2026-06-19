@@ -1,0 +1,57 @@
+name: release and publish
+
+# Single-job release: on push to main, if package.json `version` has no
+# matching vX.Y.Z release yet, build + test + publish to npm, then record a
+# GitHub Release. Everything runs in ONE job, so there is no cross-workflow
+# event chaining — which means the built-in GITHUB_TOKEN is sufficient and no
+# Personal Access Token is needed. Publishing uses the NPM_TOKEN automation
+# secret (which also bypasses npm 2FA).
+#
+# To release: bump `version` in package.json (and the pluginVersion() string
+# in src/renderers/sarif.ts), then push to main.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # create the tag + GitHub Release with GITHUB_TOKEN
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: latest
+          registry-url: 'https://registry.npmjs.org'
+      - name: Is this version already released?
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          if gh api "repos/${{ github.repository }}/releases/tags/v$v" >/dev/null 2>&1; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$v is already released — nothing to do."
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+            echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install, build, test
+        if: steps.check.outputs.new == 'true'
+        run: |
+          npm install
+          npm run build
+          npm test
+      - name: Publish to npm
+        if: steps.check.outputs.new == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish
+      - name: Create GitHub Release
+        if: steps.check.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${{ steps.check.outputs.tag }}" --generate-notes --title "${{ steps.check.outputs.tag }}"

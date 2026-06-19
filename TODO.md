@@ -11,23 +11,23 @@ conventions are aligned with the sibling plugin `sf-bulk-analyzer`
 Releases are automated via GitHub Actions:
 
 - `.github/workflows/test.yml` — lint + build + test on every non-main push.
-- `.github/workflows/onPushToMain.yml` — on push to `main`, if
-  `package.json` `version` has no matching `vX.Y.Z` release yet, regenerates
-  the oclif README, tags, and creates a GitHub Release.
-- `.github/workflows/onRelease.yml` — on a published Release, builds and
-  runs `npm publish` using the `NPM_TOKEN` repo secret.
+- `.github/workflows/release.yml` — on push to `main`, if `package.json`
+  `version` has no matching `vX.Y.Z` release yet, it builds + tests +
+  `npm publish` (via `NPM_TOKEN`) and records a GitHub Release — all in ONE
+  job. No PAT needed: because nothing chains across workflows, the built-in
+  `GITHUB_TOKEN` suffices for the release, and `NPM_TOKEN` (automation token,
+  bypasses 2FA) does the publish.
+- `.github/workflows/deprecate.yml` — manual `workflow_dispatch` to
+  deprecate/un-deprecate a version via `NPM_TOKEN` (no local 2FA).
 
-**To cut a release:** bump `version` in `package.json`, push to `main`
-(the workflow chain tags → releases → publishes). Keep the
-`pluginVersion()` string in `src/renderers/sarif.ts` in sync with the
-package version.
+**To cut a release:** bump `version` in `package.json` AND the
+`pluginVersion()` string in `src/renderers/sarif.ts`, then push to `main`.
+That's it — the release workflow publishes and tags. Pushing to `main`
+without a version bump is a safe no-op (the version-check skips).
 
-Required repo secrets: `NPM_TOKEN` (npm automation token). For the
-auto-release-on-version-bump chain to fire `onRelease`, `onPushToMain`
-also needs a PAT in `GH_TOKEN` (plus `GH_EMAIL` / `GH_USERNAME`) —
-releases created with the default `GITHUB_TOKEN` do not trigger the
-publish workflow. A release created manually with `gh release create`
-(local PAT) triggers `onRelease` without those extra secrets.
+Only repo secret required: `NPM_TOKEN`. (Publishing through the GitHub
+Release UI is intentionally NOT wired up — publish is tied to the push, not
+a release event.)
 
 ---
 

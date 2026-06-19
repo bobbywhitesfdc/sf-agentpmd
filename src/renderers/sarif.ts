@@ -204,5 +204,5 @@ function regionFromAntlr(loc: ProcedureCC['location']) {
 function pluginVersion(): string {
   // Avoid a JSON-file dep at runtime; this stays in sync with package.json
   // manually. Bumping the plugin should bump this string.
-  return '0.1.0';
+  return '0.1.1';
 }

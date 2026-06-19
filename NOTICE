@@ -9,18 +9,20 @@ Third-party components
 
 This product bundles components from the AgentScript project by
 Salesforce, Inc., which are licensed under the Apache License, Version 2.0.
-The MIT license of this product does NOT apply to these vendored components;
-they remain governed by their original Apache-2.0 license.
+Their source is vendored in this repository under vendor/ and is compiled
+(inlined) into the distributed JavaScript under dist/ at build time. The MIT
+license of this product does NOT apply to these components; they remain
+governed by their original Apache-2.0 license.
 
   Project:   AgentScript (https://github.com/salesforce/agentscript)
   Copyright: Copyright (c) 2026 Salesforce, Inc.
   License:   Apache License, Version 2.0
              (https://www.apache.org/licenses/LICENSE-2.0)
 
-  Vendored packages and on-disk locations:
+  Bundled components (repo source path → distributed form):
     - @agentscript/types@0.2.1
-        vendor/agentscript-types/
+        vendor/agentscript-types/        → inlined into dist/
     - @agentscript/parser-javascript@2.4.0
-        vendor/agentscript-parser-javascript/
+        vendor/agentscript-parser-javascript/  → inlined into dist/
 
 A copy of the Apache License, Version 2.0 is available at the URL above.

@@ -31,6 +31,38 @@ publish workflow. A release created manually with `gh release create`
 
 ---
 
+## Vendored AgentScript — upstream sync (revisit next iteration)
+
+The upstream `@agentscript/*` packages are **not published to npm**, so we
+vendor them under `vendor/` as `file:` **devDependencies** and **inline**
+them into the published bundle with esbuild (`esbuild.config.mjs`). Shipping
+`file:` deps in the published package is what broke `sf update` in 0.1.0
+(npm arborist crashed rebuilding the bundled `file:` link nodes during a
+multi-package install) — do **not** reintroduce a `file:` entry into
+runtime `dependencies`.
+
+Currently pinned (copied from `~/projects/agentscript` `dist/`):
+- `@agentscript/types@0.2.1` → `vendor/agentscript-types/`
+- `@agentscript/parser-javascript@2.4.0` → `vendor/agentscript-parser-javascript/`
+
+**The drift risk:** we vendor compiled `dist/`, not source, with no
+automatic link to upstream. If AgentScript's parser/types evolve, our copy
+silently falls behind. Before the next feature iteration:
+
+- [ ] **Check upstream for changes.** `git -C ~/projects/agentscript pull`
+      and diff the `packages/types` + `packages/parser-javascript` versions
+      against the pins above. Note any grammar/AST changes that affect CC
+      counting.
+- [ ] **Design a refresh procedure that won't fall behind.** Options to
+      evaluate: (a) a `scripts/vendor-refresh.mjs` that copies upstream
+      `dist/` + records the source commit SHA in a `vendor/VERSIONS.md`;
+      (b) consume upstream as a git dependency / git submodule pinned to a
+      SHA instead of a hand-copied `dist/`; (c) ask upstream to publish to
+      npm (then drop vendoring + bundling entirely — simplest end state).
+      Whatever we pick, capture the upstream **commit SHA** so drift is
+      detectable, and keep the esbuild inlining so no `file:` dep ever
+      ships.
+
 ## Roadmap — deferred features
 
 - **Multi-format agent analysis** (`bots/`, `genAiPlannerBundles/`). The

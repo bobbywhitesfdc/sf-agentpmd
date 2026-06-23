@@ -1,112 +1,84 @@
 # Install
 
-There are two install paths depending on the plugin's distribution
-state. As of the date this skill was last updated (2026-05-19), the
-plugin is **not yet published to npm**, so the from-source path is the
-only one that works today.
-
-## Path A — From source (today, pre-publication)
-
-The plugin lives at `~/projects/AgentForcePMD/` (or wherever the user
-cloned it). To install it into the `sf` CLI:
+## Standard install (npm — recommended)
 
 ```bash
-cd ~/projects/AgentForcePMD
-npm install
-npm run build
-sf plugins link "$(pwd)"
-```
-
-The link survives across `sf` invocations. You only need to rebuild
-(`npm run build`) when source under `src/` changes; the link itself
-remains. See [`upgrade.md`](upgrade.md) for the refresh dance.
-
-### Verify the install
-
-```bash
-sf plugins                    # should list 'sf-agentpmd  X.Y.Z (link)'
-sf agentpmd analyze --help    # should render the flag reference
-```
-
-`sf` will emit a one-time warning per process the first time you
-invoke a linked ESM plugin:
-
-> Warning: sf-agentpmd is a linked ESM module and cannot be
-> auto-transpiled. Existing compiled source will be used instead.
-
-This is benign. It's telling you `sf` is reading `lib/` (the build
-output), not running TypeScript directly. Just remember to
-`npm run build` after `src/` edits.
-
-### Where the linked plugin lives
-
-`sf plugins link` records the absolute path under
-`~/.local/share/sf/client/<version>/`. Inspecting:
-
-```bash
-sf plugins --core      # nothing — not a core plugin
-sf plugins             # sf-agentpmd appears here under its link path
-```
-
-## Path B — From npm (future, post-publication)
-
-When the plugin is published to the npm registry, the standard SF CLI
-install path applies:
-
-```bash
+sf plugins trust allowlist add -n sf-agentpmd
 sf plugins install sf-agentpmd
 ```
 
-Verify the same way:
+The `trust allowlist` step is a one-time acknowledgement per machine. It tells
+the SF CLI that `sf-agentpmd` is a trusted publisher outside the Salesforce-signed
+core. Required before the first install; not needed on subsequent upgrades.
+
+### Verify
 
 ```bash
 sf plugins                    # should list 'sf-agentpmd  X.Y.Z'
-sf agentpmd analyze --help
+sf agentpmd analyze --help    # should render the flag reference
 ```
 
-No build step, no link. Plain npm install under the hood.
-
-## Install the Claude Code skill
-
-The plugin bundles this Claude Code skill. After the plugin is installed
-(Path A or Path B), copy the skill tree into `~/.claude/skills/` with:
+### Install the Claude Code skill
 
 ```bash
 sf agentpmd install-skill
 ```
 
-This recursively copies the bundled `skill/` tree (SKILL.md plus the
-`references/` pages) to `~/.claude/skills/agentforcepmd/`. Restart Claude
-Code (or reload skills) to activate it.
+Copies the bundled skill tree to `~/.claude/skills/agentforcepmd/`. Restart
+Claude Code (or reload skills) to activate. The skill auto-triggers on mentions
+of `sf agentpmd`, "AgentScript cyclomatic complexity", "Agent CC", and related
+phrases.
 
-For an npm install, the bundled source lives at
-`node_modules/sf-agentpmd/skill/`; local-dev contributors can instead
-symlink the in-repo `skill/` directory:
+## Contributor / local-dev install (from source)
+
+For contributors or anyone who needs to build from source:
 
 ```bash
-ln -sfn ~/projects/AgentForcePMD/skill ~/.claude/skills/agentforcepmd
+git clone https://github.com/bobbywhitesfdc/sf-agentpmd
+cd sf-agentpmd
+npm install
+npm run build
+sf plugins link "$(pwd)"
 ```
+
+The link survives across `sf` invocations. Rebuild (`npm run build`) whenever
+source under `src/` changes; the link itself remains. See
+[`upgrade.md`](upgrade.md) for the refresh dance.
+
+For live skill edits, symlink instead of copying:
+
+```bash
+ln -sfn "$(pwd)/skill" ~/.claude/skills/agentforcepmd
+```
+
+### ESM warning (linked installs only)
+
+`sf` emits a one-time warning per process the first time you invoke a linked
+ESM plugin:
+
+> Warning: sf-agentpmd is a linked ESM module and cannot be auto-transpiled.
+> Existing compiled source will be used instead.
+
+Benign — `sf` is reading `lib/` (the build output), not running TypeScript
+directly. Just remember to `npm run build` after `src/` edits.
 
 ## Prerequisites
 
-- **Node.js ≥ 20** (the plugin declares `"engines": { "node": ">=20" }`).
-- **`sf` CLI v2.131+** (older versions don't load linked ESM plugins
-  reliably).
-- **`@apexdevtools/apex-parser` runtime deps** — auto-installed by `npm
-  install`. Includes `antlr4` as a peer.
+- **Node.js ≥ 20** (declared in `"engines"` in `package.json`)
+- **`sf` CLI v2.131+** (older versions don't load linked ESM plugins reliably)
 
 ## Uninstall
 
 ```bash
-sf plugins unlink sf-agentpmd       # Path A — removes the link, source repo untouched
-sf plugins uninstall sf-agentpmd    # Path B — removes the npm-installed copy
+sf plugins uninstall sf-agentpmd    # npm install
+sf plugins unlink sf-agentpmd       # linked source checkout (source repo untouched)
 ```
 
 ## Common install issues
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `Command sf agentpmd not found` after link | `npm run build` not run, so `lib/` is empty / stale | `cd ~/projects/AgentForcePMD && npm run build` |
-| `Cannot find module '@agentscript/parser-javascript'` | Vendored deps missing — `vendor/` wasn't installed | `cd ~/projects/AgentForcePMD && npm install` (the `file:./vendor/...` deps re-symlink) |
-| `sf plugins link` reports "linked" but command absent | sf CLI cache | `rm -rf ~/.local/share/sf/client/*/node_modules/.cache 2>/dev/null && sf plugins link "$(pwd)"` |
-| Warning about ESM transpilation | Expected — see above | Ignore. |
+| `Command sf agentpmd not found` after link | `npm run build` not run, so `lib/` is empty / stale | `npm run build` in the repo directory |
+| `Cannot find module '@agentscript/parser-javascript'` | Vendored deps missing | `npm install` in the repo directory |
+| `sf plugins link` reports "linked" but command absent | SF CLI cache | `sf plugins link "$(pwd)"` again after clearing `~/.local/share/sf/` cache |
+| Warning about ESM transpilation | Expected for linked installs | Ignore |

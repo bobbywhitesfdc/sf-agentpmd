@@ -86,6 +86,7 @@ which downstream consumer (terminal, PR comment, CI gate, spreadsheet).
 | --- | --- |
 | Inspect a whole sfdx project | `sf agentpmd analyze` (inside the project) |
 | Inspect a specific bundle | `sf agentpmd analyze -n <DeveloperName>` |
+| Visualize where complexity lives (AgentScript vs. Apex heatmap) | `sf agentpmd analyze --format markdown > report.md` — renders a Mermaid bar chart split by layer |
 | Generate a PR / whitepaper appendix | `sf agentpmd analyze --format markdown > report.md` |
 | Gate a PR in CI | `sf agentpmd analyze --format sarif > out.sarif` (upload to Code Scanning) or `--fail-on 50` |
 | Pipe into another sf tool | `sf agentpmd analyze --json \| jq '.result.apexClasses[].classComplexity'` |
@@ -101,3 +102,10 @@ which downstream consumer (terminal, PR comment, CI gate, spreadsheet).
   that store actions in a sibling planner bundle.
 - **Flow CC.** Not implemented; tracked in `TODO.md` § 9 / Flow
   incorporation.
+- **MCP tool complexity.** `mcpTool://` targets are classified as `unknown`
+  and their backing logic is not analyzed. Complexity offloaded to an MCP
+  server is invisible to this plugin — and to all Salesforce-side static
+  analysis tools. This is a known architectural gap: a complete posture
+  picture requires analyzing both sides of the `mcpTool://` boundary. See
+  [`examples/voice-agent-posture-comparison.md`](../examples/voice-agent-posture-comparison.md)
+  for a worked example of how to quantify what an MCP server is absorbing.

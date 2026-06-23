@@ -8,6 +8,21 @@ The intent (per `docs/agent-loc-categorization-skill-v2.md` § 7) is the
 by-the-book number a SonarQube / PMD / Checkstyle run would produce — but
 applied to the AgentScript surface that those tools don't cover today.
 
+## Install
+
+```bash
+sf plugins trust allowlist add -n sf-agentpmd
+sf plugins install sf-agentpmd
+```
+
+Then activate the bundled Claude Code skill (optional):
+
+```bash
+sf agentpmd install-skill
+```
+
+See [install details and troubleshooting](#install-details) below.
+
 ## Current scope (v2)
 
 `sf agentpmd analyze [--source-dir <dir|file>] [--apex-source <dir>] [--fail-on N]`
@@ -82,7 +97,14 @@ Run it from anywhere inside an sfdx project and it just works.
 | `csv` | Spreadsheet pivots, posture-comparison matrices. | One row per procedure or Apex method. RFC-4180 quoted. |
 | `--json` | Machine consumers (e.g. another sf plugin). | SF CLI envelope around the full `AnalysisReport`. |
 
-### Example
+### Examples
+
+See [`examples/voice-agent-posture-comparison.md`](examples/voice-agent-posture-comparison.md)
+for a full rendered report comparing two voice agents — one MCP-backed, one mixed
+Apex/MCP — including the CC-by-location heatmap and a walkthrough of the MCP
+complexity gap.
+
+### Quick terminal example
 
 ```
 $ sf agentpmd analyze -d ./force-app/main/default/aiAuthoringBundles
@@ -104,8 +126,54 @@ AgentForce PMD — Cyclomatic Complexity (McCabe)
   `docs/agent-loc-categorization-skill-v2.md` (Scaffolding, Deterministic
   Logic, Reasoning Logic, Conversation Surface) as a separate sub-command
   (`sf agentpmd categorize-loc`).
+- **future** — MCP server introspection: resolve `mcpTool://` targets via
+  the MCP protocol's `tools/list` endpoint and compute schema-level
+  complexity (JSON Schema branch count) as a proxy for implementation depth.
+  When MCP server source is available, optionally walk it for true McCabe CC.
+  Goal: a complete combined CC number that accounts for complexity on both
+  sides of the `mcpTool://` boundary.
 - **future** — Flow incorporation (§ 9 of the whitepaper) once a CC analog
   for Flow elements is settled.
+
+## Install details
+
+### Standard install (npm)
+
+```bash
+sf plugins trust allowlist add -n sf-agentpmd
+sf plugins install sf-agentpmd
+```
+
+The `trust allowlist` step is a one-time acknowledgement that lets the SF CLI
+install plugins from publishers outside the Salesforce-signed core. Required
+once per machine.
+
+### Claude Code skill
+
+```bash
+sf agentpmd install-skill
+```
+
+Copies the bundled skill tree to `~/.claude/skills/agentforcepmd/`. Restart
+Claude Code to activate. The skill auto-triggers on mentions of
+`sf agentpmd`, "AgentScript cyclomatic complexity", "Agent CC", and related
+phrases.
+
+### Local dev / contributor install
+
+```bash
+git clone https://github.com/bobbywhitesfdc/sf-agentpmd
+cd sf-agentpmd
+npm install
+npm run build
+sf plugins link "$(pwd)"
+```
+
+Symlink the skill for live edits:
+
+```bash
+ln -sfn "$(pwd)/skill" ~/.claude/skills/agentforcepmd
+```
 
 ## How it parses
 

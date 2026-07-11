@@ -8,6 +8,8 @@ import type {
 } from '../analyzer/types.js';
 import type { RenderOptions } from './options.js';
 
+import { CC_HIGH, CC_MODERATE } from './cc-thresholds.js';
+
 const KIND_LABEL: Record<ProcedureCC['kind'], string> = {
   after_reasoning: 'after_reasoning',
   available_when: 'available_when',
@@ -190,12 +192,12 @@ function colorize(on: boolean): Colorizer {
   return {
     breakdown: pc.gray,
     cc(n: number) {
-      // Palette echoes whitepaper temperature: cool for low, hot for high.
+      // Standard McCabe/SEI risk bands (see cc-thresholds): green ≤10 (low),
+      // yellow 11–20 (moderate), red ≥21 (high). Language-agnostic.
       const s = String(n);
-      if (n >= 20) return pc.red(s);
-      if (n >= 10) return pc.yellow(s);
-      if (n >= 5) return pc.green(s);
-      return pc.gray(s);
+      if (n >= CC_HIGH) return pc.red(s);
+      if (n >= CC_MODERATE) return pc.yellow(s);
+      return pc.green(s);
     },
     path: pc.cyan,
     scope: pc.bold,

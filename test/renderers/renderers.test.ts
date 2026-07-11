@@ -52,9 +52,13 @@ describe('renderers — gametwo end-to-end', () => {
     // Header + tables present
     expect(md).to.include('# AgentForce PMD');
     expect(md).to.include('## CC by location');
-    expect(md).to.include('| **Totals** | 21 | 30 | 51 |');
+    expect(md).to.include('| **Totals** | 🔴 21 | 🔴 30 | 🔴 51 |');
     expect(md).to.include('## Per-bundle');
     expect(md).to.include('## Apex backing logic');
+
+    // CC cells carry stoplight bands (🟢 ≤10, 🟡 11–20, 🔴 ≥21)
+    expect(md).to.include('🟡 19'); // a moderate procedure
+    expect(md).to.include('🟢 10'); // an Apex method at the low ceiling
 
     // Cell-pipe escaping: the GameTwo_PlayRound `||` contributor must be
     // escaped so it doesn't break the row.
@@ -81,13 +85,13 @@ describe('renderers — gametwo end-to-end', () => {
       r.properties.complexity === 10 &&
       r.ruleId === 'AGENTPMD.ApexCyclomaticComplexity',
     );
-    expect(playOne?.level).to.equal('warning'); // >= 10 default
+    expect(playOne?.level).to.equal('note'); // CC 10 is low (below moderate=11)
 
     const gametwoSimpleProc = results.find(r =>
       r.properties.complexity === 19 &&
       r.ruleId === 'AGENTPMD.AgentScriptCyclomaticComplexity',
     );
-    expect(gametwoSimpleProc?.level).to.equal('warning'); // 19 ≥ 10
+    expect(gametwoSimpleProc?.level).to.equal('warning'); // 19 is moderate (11–20)
   });
 
   it('sarif renderer: custom thresholds promote to error level', async () => {

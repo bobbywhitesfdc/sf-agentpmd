@@ -11,7 +11,7 @@ export interface RenderOptions {
   /**
    * SARIF severity thresholds. Methods/procedures with complexity at or above
    * `warning` are flagged `level: warning`; at or above `error` → `level: error`.
-   * Default: warning=10, error=20 (matches PMD's methodReportLevel default).
+   * Default: warning=11, error=21 (McCabe/SEI risk bands: moderate 11–20, high ≥21).
    */
   sarifWarningThreshold?: number;
   /** Rule width for the text renderer. Default: 60. */

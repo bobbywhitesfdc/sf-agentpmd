@@ -7,6 +7,8 @@ import type {
 } from '../analyzer/types.js';
 import type { RenderOptions } from './options.js';
 
+import { CC_HIGH, CC_MODERATE } from './cc-thresholds.js';
+
 interface SarifLog {
   $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json';
   runs: SarifRun[];
@@ -49,8 +51,9 @@ interface SarifLocation {
   };
 }
 
-const DEFAULT_WARNING = 10;
-const DEFAULT_ERROR = 20;
+// Standard SEI/McCabe risk bands: moderate (warning) starts at 11, high (error) at 21.
+const DEFAULT_WARNING = CC_MODERATE;
+const DEFAULT_ERROR = CC_HIGH;
 
 const RULE_AGENT_CC: SarifRule = {
   defaultConfiguration: { level: 'note' },

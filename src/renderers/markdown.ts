@@ -7,6 +7,8 @@ import type {
   ProcedureCC,
 } from '../analyzer/types.js';
 
+import { ccBand } from './cc-thresholds.js';
+
 const KIND_LABEL: Record<ProcedureCC['kind'], string> = {
   after_reasoning: 'after_reasoning',
   available_when: 'available_when',
@@ -42,17 +44,17 @@ export function renderMarkdown(report: AnalysisReport): string {
     renderMermaid(report), '',
     `| | AgentScript | Apex | Combined |\n` +
       `| --- | ---: | ---: | ---: |\n` +
-      `| **Totals** | ${report.totalComplexity} | ${report.totalApexComplexity} | ${report.totalComplexity + report.totalApexComplexity} |`, ''
+      `| **Totals** | ${ccBand(report.totalComplexity)} ${report.totalComplexity} | ${ccBand(report.totalApexComplexity)} ${report.totalApexComplexity} | ${ccBand(report.totalComplexity + report.totalApexComplexity)} ${report.totalComplexity + report.totalApexComplexity} |`, ''
   , '## Per-bundle (`.agent` files)', '');
   for (const f of report.files) {
-    lines.push(`### \`${f.path}\` — CC = ${f.fileComplexity}`, '');
+    lines.push(`### \`${f.path}\` — CC = ${ccBand(f.fileComplexity)} ${f.fileComplexity}`, '');
     if (f.procedures.length === 0) {
       lines.push('_(no procedure-bearing scopes)_');
     } else {
       lines.push('| Scope | Procedure | CC | Contributors |', '| --- | --- | ---: | --- |');
       for (const p of f.procedures) {
         lines.push(
-          `| ${escapeCell(p.scope)} | ${KIND_LABEL[p.kind]} | ${p.complexity} | ${escapeCell(breakdownProc(p.contributors))} |`,
+          `| ${escapeCell(p.scope)} | ${KIND_LABEL[p.kind]} | ${ccBand(p.complexity)} ${p.complexity} | ${escapeCell(breakdownProc(p.contributors))} |`,
         );
       }
     }
@@ -86,7 +88,7 @@ export function renderMarkdown(report: AnalysisReport): string {
     lines.push('## Apex backing logic', '');
     for (const cls of report.apexClasses) {
       lines.push(
-        `### \`${cls.path}\` — class CC = ${cls.classComplexity}`, '',
+        `### \`${cls.path}\` — class CC = ${ccBand(cls.classComplexity)} ${cls.classComplexity}`, '',
         `Referenced by: ${cls.referencedBy.map(r => `\`${r}\``).join(', ') || '_none_'}`, '',
       );
       if (cls.methods.length === 0) {
@@ -95,7 +97,7 @@ export function renderMarkdown(report: AnalysisReport): string {
         lines.push('| Method | CC | Contributors |', '| --- | ---: | --- |');
         for (const m of cls.methods) {
           lines.push(
-            `| \`${escapeCell(m.signature)}\` | ${m.complexity} | ${escapeCell(breakdownApex(m.contributors))} |`,
+            `| \`${escapeCell(m.signature)}\` | ${ccBand(m.complexity)} ${m.complexity} | ${escapeCell(breakdownApex(m.contributors))} |`,
           );
         }
       }

@@ -16,6 +16,21 @@ action declarations and references, and emits a "CC by location"
 roll-up (AgentScript vs. Apex vs. Combined) suitable for posture analysis
 or static-analysis CI gates.
 
+## Preflight — confirm the CLI plugin is installed
+
+This skill drives the `sf agentpmd` commands, provided by the **separate** `sf-agentpmd`
+CLI plugin. Installing this Claude plugin does **not** install the CLI. Before the first
+analysis in a session, confirm the command resolves:
+
+```
+sf agentpmd --help
+```
+
+If that fails with "command not found" / "not installed", stop and install the CLI plugin
+first — see [`references/install.md`](references/install.md) (pre-publication: clone +
+`npm run build` + `sf plugins link`; after npm publish: `sf plugins install sf-agentpmd`).
+Do not attempt to analyze a bundle until `sf agentpmd` resolves.
+
 ## What it does at a glance
 
 - Walks every `.agent` file under a source directory (or auto-discovers

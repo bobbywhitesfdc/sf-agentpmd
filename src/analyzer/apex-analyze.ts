@@ -92,7 +92,7 @@ async function analyzeApexClass(
     className: className || basename(absPath, '.cls'),
     methods,
     parseErrors: [],
-    path: relative(sourceDirRoot, absPath),
+    path: relative(sourceDirRoot, absPath).replaceAll('\\', '/'), // normalize to POSIX separators for deterministic cross-platform output
     referencedBy,
   };
 }

@@ -18,12 +18,21 @@ function isSymlink(p: string): boolean {
 }
 
 export default class AgentpmdInstallSkill extends SfCommand<{ installed: string }> {
+  public static readonly deprecationOptions = {
+    message:
+      'sf agentpmd install-skill is deprecated. sf-agentpmd now ships as a Claude Code plugin — ' +
+      'install it via the Claude Code /plugin command instead of copying the skill into ~/.claude/skills. ' +
+      'If you ran this command before, remove ~/.claude/skills/agentforcepmd to avoid a stale copy ' +
+      'shadowing the plugin version.',
+  };
   public static readonly description = `Recursively copies the bundled skill tree (SKILL.md plus its references/
 pages) to ~/.claude/skills/agentforcepmd/ so Claude Code can use it as a
 skill. Any existing install at that path (including a dev symlink into a
 checkout) is replaced. Restart Claude Code (or reload skills) afterward.`;
   public static readonly examples = ['$ sf agentpmd install-skill'];
-  public static readonly summary = 'Install the agentforcepmd Claude Code skill to ~/.claude/skills/.';
+  public static readonly state = 'deprecated';
+  public static readonly summary =
+    '[DEPRECATED] Install the agentforcepmd Claude Code skill to ~/.claude/skills/.';
 
   public async run(): Promise<{ installed: string }> {
     // Resolve the skill source relative to this package's installed location.
@@ -32,7 +41,7 @@ checkout) is replaced. Restart Claude Code (or reload skills) afterward.`;
     // package root (above dist/) takes four hops: install-skill.js → agentpmd
     // → commands → dist → <pkgRoot>.
     const pkgRoot = join(fileURLToPath(import.meta.url), '..', '..', '..', '..');
-    const skillSrc = join(pkgRoot, 'skill');
+    const skillSrc = join(pkgRoot, 'skills', 'agentforcepmd');
 
     if (!existsSync(skillSrc)) {
       this.error(`Skill source not found at ${skillSrc} — is the package installed correctly?`);

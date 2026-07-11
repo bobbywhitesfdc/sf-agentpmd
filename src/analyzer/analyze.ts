@@ -144,7 +144,7 @@ export async function analyzeFile(absPath: string, base: string): Promise<FileRe
     declarations,
     fileComplexity: cc.total,
     parseErrors: [], // CST is error-tolerant; surface diagnostics in a later iteration.
-    path: relative(base, absPath),
+    path: relative(base, absPath).replaceAll('\\', '/'), // normalize to POSIX separators for deterministic cross-platform output
     procedures,
     references,
   };

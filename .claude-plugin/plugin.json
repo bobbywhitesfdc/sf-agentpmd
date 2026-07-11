@@ -1,0 +1,8 @@
+{
+  "name": "agentforcepmd",
+  "description": "Orchestrates the `sf agentpmd` CLI to compute McCabe cyclomatic complexity for AgentScript (.agent) bundles and their apex:// backing classes, and to inventory action references — removes the burden of remembering the commands, flags, and output formats.",
+  "version": "0.1.2",
+  "author": { "name": "Bobby White" },
+  "homepage": "https://github.com/bobbywhitesfdc/sf-agentpmd",
+  "license": "MIT"
+}

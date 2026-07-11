@@ -27,9 +27,10 @@
     "apex"
   ],
   "files": [
+    "./.claude-plugin",
     "./bin",
     "./dist",
-    "./skill",
+    "./skills",
     "./oclif.manifest.json",
     "./LICENSE",
     "./NOTICE"

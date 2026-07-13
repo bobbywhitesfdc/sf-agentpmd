@@ -239,37 +239,20 @@ node bin/dev.js agentpmd analyze --source-dir test/fixtures
 
 The plugin uses ESM throughout and targets Node ≥ 20.
 
-## Claude Code skill
+## Claude Code Plugin
 
-The plugin ships with a bundled Claude Code skill (at `skill/` in the repo)
-that wraps the plugin from an adopter's point of view — discovery,
+The plugin ships as a Claude Code plugin (at `skills/agentforcepmd/` in the
+repo) that wraps the plugin from an adopter's point of view — discovery,
 install, upgrade, and output interpretation. It auto-triggers when a
 Claude session mentions `sf agentpmd`, "AgentScript cyclomatic
 complexity", or related phrases.
 
-**Activate the skill.** After installing the plugin, run:
-
-```bash
-sf agentpmd install-skill
-```
-
-This recursively copies the bundled skill tree to
-`~/.claude/skills/agentforcepmd/`. Restart Claude Code (or reload skills)
-to activate it.
-
-Local-dev contributors can instead symlink the in-repo `skill/` directory
-(it moved from `.claude/skills/agentforcepmd/` to `skill/`) so edits show
-up live:
-
-```bash
-ln -sfn "$(pwd)/skill" ~/.claude/skills/agentforcepmd
-```
-
-The skill's `SKILL.md` indexes four reference pages:
+The skill bundles four reference pages:
 
 - `references/command-structure.md` — every flag, defaults, exit codes
-- `references/install.md` — both pre- and post-publication install paths
-- `references/upgrade.md` — refresh dance for a linked checkout, plus
-  `sf plugins update` for the published case
+- `references/install.md` — install paths and troubleshooting
+- `references/upgrade.md` — upgrade flow for linked and published installs
 - `references/output-formats.md` — text / JSON / markdown / SARIF / CSV
   surface with examples, plus a "pick a format" cheat sheet
+
+See [Claude Code Plugin](#claude-code-plugin-1) in Install details for activation instructions.

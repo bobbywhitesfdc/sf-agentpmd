@@ -86,17 +86,17 @@ sf plugins link "$(pwd)"
 
 ## Refreshing the Claude Code skill
 
-The bundled skill ships inside the plugin, so a plugin upgrade may carry
-new skill content. After upgrading, re-copy the skill tree:
+The bundled skill ships inside the plugin package, so a plugin upgrade
+automatically carries new skill content. The symlink at
+`~/.claude/skills/agentpmd` points directly to the installed npm package,
+so after upgrading the plugin the new skill content is picked up on the
+next Claude Code session — no re-registration needed.
 
 ```bash
-sf agentpmd install-skill   # re-copies skill/ to ~/.claude/skills/agentforcepmd/
+sf plugins install sf-agentpmd   # upgrade to latest
 ```
 
-Restart Claude Code (or reload skills) to pick up the new content. If you
-use a local-dev symlink (`~/.claude/skills/agentforcepmd` -> the repo's
-`skill/` directory), no re-copy is needed — a `git pull` updates the
-skill in place.
+Restart Claude Code to activate the new skill content.
 
 ## Verifying the upgrade
 

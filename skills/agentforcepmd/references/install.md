@@ -18,15 +18,14 @@ sf plugins                    # should list 'sf-agentpmd  X.Y.Z'
 sf agentpmd analyze --help    # should render the flag reference
 ```
 
-### Install the Claude Code skill
+### Register the Claude Code plugin
 
 ```bash
-sf agentpmd install-skill
+ln -sfn ~/.local/share/sf/node_modules/sf-agentpmd ~/.claude/skills/agentpmd
 ```
 
-Copies the bundled skill tree to `~/.claude/skills/agentforcepmd/`. Restart
-Claude Code (or reload skills) to activate. The skill auto-triggers on mentions
-of `sf agentpmd`, "AgentScript cyclomatic complexity", "Agent CC", and related
+Restart Claude Code to activate. The skill auto-triggers on mentions of
+`sf agentpmd`, "AgentScript cyclomatic complexity", "Agent CC", and related
 phrases.
 
 ## Contributor / local-dev install (from source)
@@ -45,10 +44,10 @@ The link survives across `sf` invocations. Rebuild (`npm run build`) whenever
 source under `src/` changes; the link itself remains. See
 [`upgrade.md`](upgrade.md) for the refresh dance.
 
-For live skill edits, symlink instead of copying:
+For live skill edits, symlink from the repo root:
 
 ```bash
-ln -sfn "$(pwd)/skill" ~/.claude/skills/agentforcepmd
+ln -sfn "$(pwd)" ~/.claude/skills/agentpmd
 ```
 
 ### ESM warning (linked installs only)

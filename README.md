@@ -255,4 +255,4 @@ The skill bundles four reference pages:
 - `references/output-formats.md` — text / JSON / markdown / SARIF / CSV
   surface with examples, plus a "pick a format" cheat sheet
 
-See [Claude Code Plugin](#claude-code-plugin-1) in Install details for activation instructions.
+See [Install details → Claude Code Plugin](#claude-code-plugin) below for activation instructions.

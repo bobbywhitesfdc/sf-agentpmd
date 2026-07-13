@@ -15,10 +15,10 @@ sf plugins trust allowlist add -n sf-agentpmd
 sf plugins install sf-agentpmd
 ```
 
-Then activate the bundled Claude Code skill (optional):
+Then register the bundled Claude Code plugin (optional):
 
 ```bash
-sf agentpmd install-skill
+ln -sfn ~/.local/share/sf/node_modules/sf-agentpmd ~/.claude/skills/agentpmd
 ```
 
 See [install details and troubleshooting](#install-details) below.
@@ -148,16 +148,19 @@ The `trust allowlist` step is a one-time acknowledgement that lets the SF CLI
 install plugins from publishers outside the Salesforce-signed core. Required
 once per machine.
 
-### Claude Code skill
+### Claude Code Plugin
+
+Register the bundled Claude Code plugin after installing:
 
 ```bash
-sf agentpmd install-skill
+ln -sfn ~/.local/share/sf/node_modules/sf-agentpmd ~/.claude/skills/agentpmd
 ```
 
-Copies the bundled skill tree to `~/.claude/skills/agentforcepmd/`. Restart
-Claude Code to activate. The skill auto-triggers on mentions of
+Restart Claude Code to activate. The skill auto-triggers on mentions of
 `sf agentpmd`, "AgentScript cyclomatic complexity", "Agent CC", and related
 phrases.
+
+> **Note:** `sf agentpmd install-skill` is deprecated. Use the symlink approach above.
 
 ### Local dev / contributor install
 
@@ -169,10 +172,10 @@ npm run build
 sf plugins link "$(pwd)"
 ```
 
-Symlink the skill for live edits:
+Symlink from your working clone for live edits:
 
 ```bash
-ln -sfn "$(pwd)/skill" ~/.claude/skills/agentforcepmd
+ln -sfn "$(pwd)" ~/.claude/skills/agentpmd
 ```
 
 ## How it parses

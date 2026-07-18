@@ -10,15 +10,22 @@ applied to the AgentScript surface that those tools don't cover today.
 
 ## Install
 
+`sf-agentpmd` ships two ways. Most users want the **Claude Code skill** — it drives the CLI for you and bootstraps the CLI plugin on first use.
+
+### Claude Code skill (recommended)
+
+```bash
+/plugin marketplace add bobbywhitesfdc/salesforce-toolkit
+/plugin install sf-agentpmd@salesforce-toolkit
+```
+
+On first use the skill checks for the `sf agentpmd` CLI plugin and, with your confirmation, installs it.
+
+### SF CLI plugin (direct)
+
 ```bash
 sf plugins trust allowlist add -n sf-agentpmd
 sf plugins install sf-agentpmd
-```
-
-Then register the bundled Claude Code plugin (optional):
-
-```bash
-ln -sfn ~/.local/share/sf/node_modules/sf-agentpmd ~/.claude/skills/agentpmd
 ```
 
 See [install details and troubleshooting](#install-details) below.
@@ -148,19 +155,18 @@ The `trust allowlist` step is a one-time acknowledgement that lets the SF CLI
 install plugins from publishers outside the Salesforce-signed core. Required
 once per machine.
 
-### Claude Code Plugin
+### Claude Code skill
 
-Register the bundled Claude Code plugin after installing:
+Install the skill from the Salesforce Toolkit marketplace — it bootstraps this
+CLI plugin on first use:
 
 ```bash
-ln -sfn ~/.local/share/sf/node_modules/sf-agentpmd ~/.claude/skills/agentpmd
+/plugin marketplace add bobbywhitesfdc/salesforce-toolkit
+/plugin install sf-agentpmd@salesforce-toolkit
 ```
 
-Restart Claude Code to activate. The skill auto-triggers on mentions of
-`sf agentpmd`, "AgentScript cyclomatic complexity", "Agent CC", and related
-phrases.
-
-> **Note:** `sf agentpmd install-skill` is deprecated. Use the symlink approach above.
+The skill auto-triggers on mentions of `sf agentpmd`, "AgentScript cyclomatic
+complexity", "Agent CC", and related phrases.
 
 ### Local dev / contributor install
 
@@ -170,12 +176,6 @@ cd sf-agentpmd
 npm install
 npm run build
 sf plugins link "$(pwd)"
-```
-
-Symlink from your working clone for live edits:
-
-```bash
-ln -sfn "$(pwd)" ~/.claude/skills/agentpmd
 ```
 
 ## How it parses
@@ -241,7 +241,7 @@ The plugin uses ESM throughout and targets Node ≥ 20.
 
 ## Claude Code Plugin
 
-The plugin ships as a Claude Code plugin (at `skills/agentforcepmd/` in the
+The plugin ships as a Claude Code skill (at `skills/sf-agentpmd/` in the
 repo) that wraps the plugin from an adopter's point of view — discovery,
 install, upgrade, and output interpretation. It auto-triggers when a
 Claude session mentions `sf agentpmd`, "AgentScript cyclomatic
@@ -255,4 +255,4 @@ The skill bundles four reference pages:
 - `references/output-formats.md` — text / JSON / markdown / SARIF / CSV
   surface with examples, plus a "pick a format" cheat sheet
 
-See [Install details → Claude Code Plugin](#claude-code-plugin) below for activation instructions.
+See [Install](#install) for activation instructions.

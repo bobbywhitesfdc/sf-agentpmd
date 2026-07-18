@@ -7,7 +7,7 @@ means pulling new commits and rebuilding `lib/`. The link itself does
 not need to be re-established.
 
 ```bash
-cd ~/projects/AgentForcePMD
+cd ~/projects/sf-agentpmd
 git pull --ff-only
 npm install                   # if dependencies changed
 npm run build
@@ -61,7 +61,7 @@ npm view sf-agentpmd version   # shows current published version
 sf plugins install sf-agentpmd@0.2.0
 
 # Path A: git checkout the desired tag, then rebuild
-cd ~/projects/AgentForcePMD
+cd ~/projects/sf-agentpmd
 git checkout v0.2.0
 npm install
 npm run build
@@ -80,23 +80,21 @@ To move from the published version back to a linked checkout:
 
 ```bash
 sf plugins uninstall sf-agentpmd
-cd ~/projects/AgentForcePMD
+cd ~/projects/sf-agentpmd
 sf plugins link "$(pwd)"
 ```
 
 ## Refreshing the Claude Code skill
 
-The bundled skill ships inside the plugin package, so a plugin upgrade
-automatically carries new skill content. The symlink at
-`~/.claude/skills/agentpmd` points directly to the installed npm package,
-so after upgrading the plugin the new skill content is picked up on the
-next Claude Code session — no re-registration needed.
+The skill is delivered through the `salesforce-toolkit` marketplace, separately
+from the SF CLI plugin. To pull the latest skill content:
 
 ```bash
-sf plugins install sf-agentpmd   # upgrade to latest
+/plugin marketplace update salesforce-toolkit
 ```
 
-Restart Claude Code to activate the new skill content.
+The underlying `sf-agentpmd` CLI plugin updates independently (see Path A / Path B
+above). Restart Claude Code after a marketplace update to activate new skill content.
 
 ## Verifying the upgrade
 

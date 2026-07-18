@@ -5,8 +5,8 @@
 The plugin is published to npm as the unscoped **`sf-agentpmd`** and its
 conventions are aligned with the sibling plugin `sf-bulk-analyzer`
 (oclif scaffold, `dist/` build output, eslint + prettier + mocha/chai,
-`@oclif/plugin-help`, a bundled Claude Code skill installed via
-`sf agentpmd install-skill`).
+`@oclif/plugin-help`, and a Claude Code skill distributed via the
+`salesforce-toolkit` marketplace).
 
 Releases are automated via GitHub Actions:
 

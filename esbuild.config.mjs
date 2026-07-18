@@ -22,7 +22,6 @@ await esbuild.build({
   entryPoints: [
     'src/index.ts',
     'src/commands/agentpmd/analyze.ts',
-    'src/commands/agentpmd/install-skill.ts',
   ],
   // @agentscript/* and tiny-invariant are intentionally NOT external — they
   // get inlined. node: builtins are external automatically on platform:node.

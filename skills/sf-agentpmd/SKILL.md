@@ -1,10 +1,10 @@
 ---
-name: agentforcepmd
+name: sf-agentpmd
 description: Use this skill whenever working with the sf-agentpmd SF CLI plugin — discovering its commands, installing or upgrading it, running it against an Agentforce / AgentScript project, or interpreting its text / JSON / Markdown / SARIF / CSV outputs. Triggers on mentions of `sf agentpmd`, "AgentScript cyclomatic complexity", "Agent CC", "McCabe analysis of .agent files", "agent PMD", or any request to compute or report complexity / action-reference inventory for AgentScript bundles and the Apex backing logic they invoke.
 metadata:
   type: skill
-  version: "0.1.0"
-  last_updated: "2026-05-19"
+  version: "0.2.0"
+  last_updated: "2026-07-18"
 ---
 
 # sf-agentpmd
@@ -16,20 +16,30 @@ action declarations and references, and emits a "CC by location"
 roll-up (AgentScript vs. Apex vs. Combined) suitable for posture analysis
 or static-analysis CI gates.
 
-## Preflight — confirm the CLI plugin is installed
+## Preflight — ensure the CLI plugin is installed (bootstrap on demand)
 
-This skill drives the `sf agentpmd` commands, provided by the **separate** `sf-agentpmd`
-CLI plugin. Installing this Claude plugin does **not** install the CLI. Before the first
-analysis in a session, confirm the command resolves:
+This skill drives the `sf agentpmd` commands, provided by the **separate** `sf-agentpmd` SF CLI
+plugin. Installing this Claude plugin does **not** install the CLI — the skill bootstraps it on
+first use. Before the first analysis in a session, confirm the command resolves:
 
 ```
 sf agentpmd --help
 ```
 
-If that fails with "command not found" / "not installed", stop and install the CLI plugin
-first — see [`references/install.md`](references/install.md) (pre-publication: clone +
-`npm run build` + `sf plugins link`; after npm publish: `sf plugins install sf-agentpmd`).
-Do not attempt to analyze a bundle until `sf agentpmd` resolves.
+If that fails ("command not found" / "is not a sf command"), the CLI plugin is missing. Bootstrap
+it **with the user's explicit consent** — the first step adds an unsigned plugin to the SF CLI trust
+allowlist, so ask before running it:
+
+1. Ask the user to confirm you may install the `sf-agentpmd` CLI plugin.
+2. On confirmation, run both commands:
+   ```
+   sf plugins trust allowlist add -n sf-agentpmd
+   sf plugins install sf-agentpmd
+   ```
+3. Re-run `sf agentpmd --help`. If it now resolves, proceed.
+
+Do not analyze a bundle until `sf agentpmd` resolves. Never add to the trust allowlist without the
+user's confirmation. (Contributors building from source: see [`references/install.md`](references/install.md).)
 
 ## What it does at a glance
 
@@ -58,10 +68,10 @@ Covers the topic / command tree, every flag, defaults, and short aliases.
 
 ### "How do I install it?"
 
-Read [`references/install.md`](references/install.md). Covers both:
-- **Today (pre-publication):** clone + `npm install` + `npm run build` +
-  `sf plugins link`.
-- **Future (after npm publish):** `sf plugins install sf-agentpmd`.
+Read [`references/install.md`](references/install.md). Covers the marketplace
+install (`/plugin marketplace add bobbywhitesfdc/salesforce-toolkit` →
+`/plugin install sf-agentpmd@salesforce-toolkit`), the direct
+`sf plugins install sf-agentpmd`, and the from-source contributor path.
 
 ### "How do I upgrade it?"
 

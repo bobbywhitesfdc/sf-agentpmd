@@ -7,7 +7,7 @@ means pulling new commits and rebuilding `lib/`. The link itself does
 not need to be re-established.
 
 ```bash
-cd ~/projects/sf-agentpmd
+cd <your-checkout>/sf-agentpmd
 git pull --ff-only
 npm install                   # if dependencies changed
 npm run build
@@ -61,7 +61,7 @@ npm view sf-agentpmd version   # shows current published version
 sf plugins install sf-agentpmd@0.2.0
 
 # Path A: git checkout the desired tag, then rebuild
-cd ~/projects/sf-agentpmd
+cd <your-checkout>/sf-agentpmd
 git checkout v0.2.0
 npm install
 npm run build
@@ -80,7 +80,7 @@ To move from the published version back to a linked checkout:
 
 ```bash
 sf plugins uninstall sf-agentpmd
-cd ~/projects/sf-agentpmd
+cd <your-checkout>/sf-agentpmd
 sf plugins link "$(pwd)"
 ```
 

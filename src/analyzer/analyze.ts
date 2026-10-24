@@ -12,7 +12,7 @@ import type {
 import { collectDeclarations, collectReferences } from './action-references.js';
 import { analyzeReferencedApex } from './apex-analyze.js';
 import { collectScopes, complexityForFile } from './complexity.js';
-import { extractDeveloperName, parseAgentSource } from './parse.js';
+import { decodeAgentSource, extractDeveloperName, parseAgentSource } from './parse.js';
 
 export interface AnalyzeOptions {
   /** Override location for apex:// resolution. Optional. */
@@ -126,7 +126,7 @@ export async function analyzeSource(
 }
 
 export async function analyzeFile(absPath: string, base: string): Promise<FileReport> {
-  const source = await readFile(absPath, 'utf8');
+  const source = decodeAgentSource(await readFile(absPath, 'utf8'));
   const root = parseAgentSource(source);
 
   const cc = complexityForFile(root);
@@ -253,7 +253,7 @@ async function filterByApiNames(
 }
 
 async function readDeveloperName(file: string): Promise<string | undefined> {
-  const source = await readFile(file, 'utf8');
+  const source = decodeAgentSource(await readFile(file, 'utf8'));
   const root = parseAgentSource(source);
   return extractDeveloperName(root);
 }

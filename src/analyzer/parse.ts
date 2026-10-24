@@ -2,6 +2,43 @@ import type { SyntaxNode } from '@agentscript/types';
 
 import { parse as parseAgent } from '@agentscript/parser-javascript';
 
+const AGENTSCRIPT_MARKERS = ['system:', 'start_agent', 'subagent', 'config:'];
+// Base64 blobs from `sf` retrieve are a single unbroken line — no internal whitespace.
+const BASE64_BLOB_RE = /^[A-Za-z0-9+/]+=*$/;
+
+function looksLikeBase64Blob(s: string): boolean {
+  return BASE64_BLOB_RE.test(s);
+}
+
+function hasAgentScriptMarkers(s: string): boolean {
+  return AGENTSCRIPT_MARKERS.some(m => s.includes(m));
+}
+
+/**
+ * Unwrap base64-encoded .agent files written by `sf` retrieve.
+ *
+ * Salesforce serializes .agent content as a base64 blob on retrieve; some
+ * files are double-encoded (base64 of base64). This function decodes up to
+ * three times, stopping as soon as AgentScript markers appear in the result.
+ * Falls back to the raw string when the content is not a base64 blob or
+ * markers never appear after decoding (future plain-text files are safe).
+ */
+export function decodeAgentSource(raw: string): string {
+  let current = raw.trim();
+  for (let i = 0; i < 3; i++) {
+    if (!looksLikeBase64Blob(current)) return raw;
+    const decoded = Buffer.from(current, 'base64').toString('utf8');
+    if (hasAgentScriptMarkers(decoded)) return decoded;
+    // Decoded content lacks markers but is still base64 (double-encoding).
+    // Advance and try once more; give up if it no longer looks like base64.
+    const next = decoded.trim();
+    if (!looksLikeBase64Blob(next)) return raw;
+    current = next;
+  }
+
+  return raw;
+}
+
 export function parseAgentSource(source: string): SyntaxNode {
   return parseAgent(source).rootNode;
 }

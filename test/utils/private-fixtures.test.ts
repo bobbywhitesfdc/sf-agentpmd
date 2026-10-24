@@ -60,4 +60,17 @@ describePrivate('private-fixture analysis (skipped when empty)', () => {
     const report = await analyzeSource(dir);
     expect(report.files.length).to.be.at.least(0);
   });
+
+  it('produces CC > 0 across private fixtures (base64 decode regression)', async () => {
+    // Guards against the issue-7 regression: base64-encoded .agent files being
+    // read as raw bytes, producing CC = 0 for every bundle. Any real-world
+    // fixture set that contains AgentScript content should yield totalComplexity > 0.
+    const dir = privateFixturesDir()!;
+    const report = await analyzeSource(dir);
+    if (report.files.length === 0) return; // empty dir — nothing to assert
+    expect(report.totalComplexity).to.be.greaterThan(
+      0,
+      `All ${report.files.length} bundle(s) returned CC = 0 — likely a base64 decode failure`,
+    );
+  });
 });

@@ -54,6 +54,7 @@ export function complexityOf(body: SyntaxNode, scope: string, kind: ProcedureCC[
     contributors,
     kind,
     location: locOf(body),
+    name: `${scope} [${kind}]`,
     scope,
   };
 }

@@ -1,3 +1,6 @@
+// Injected at build time by esbuild (see esbuild.config.mjs define.__PLUGIN_VERSION__).
+declare const __PLUGIN_VERSION__: string;
+
 import type {
   AnalysisReport,
   ApexClassReport,
@@ -205,7 +208,9 @@ function regionFromAntlr(loc: ProcedureCC['location']) {
 }
 
 function pluginVersion(): string {
-  // Avoid a JSON-file dep at runtime; this stays in sync with package.json
-  // manually. Bumping the plugin should bump this string.
-  return '0.4.0';
+  try {
+    return __PLUGIN_VERSION__;
+  } catch {
+    return '0.0.0-dev';
+  }
 }

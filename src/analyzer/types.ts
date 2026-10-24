@@ -10,6 +10,8 @@ export interface ProcedureCC {
   contributors: CCContributor[];
   kind: 'after_reasoning' | 'available_when' | 'before_reasoning' | 'other' | 'reasoning_instructions';
   location: SourceLocation;
+  /** Canonical label combining scope and kind: `"start_agent router [reasoning_instructions]"`. */
+  name: string;
   scope: string;
 }
 

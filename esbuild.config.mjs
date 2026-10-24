@@ -1,4 +1,7 @@
 import * as esbuild from 'esbuild'
+import { readFileSync } from 'node:fs'
+
+const { version } = JSON.parse(readFileSync('./package.json', 'utf8'))
 
 // We vendor the upstream @agentscript/* packages (not published to npm) under
 // vendor/ and consume them as file: devDependencies. Shipping file: deps in a
@@ -19,6 +22,7 @@ const external = [
 
 await esbuild.build({
   bundle: true,
+  define: { __PLUGIN_VERSION__: JSON.stringify(version) },
   entryPoints: [
     'src/index.ts',
     'src/commands/agentpmd/analyze.ts',

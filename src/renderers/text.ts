@@ -57,15 +57,20 @@ function resolveOptions(opts: RenderOptions | undefined): ResolvedOptions {
   };
 }
 
+interface RenderCtx {
+  c: Colorizer;
+  g: Glyphs;
+  r: ResolvedOptions;
+}
+
 export function renderText(report: AnalysisReport, opts?: RenderOptions): string {
   const r = resolveOptions(opts);
-  const g = r.ascii ? ASCII_GLYPHS : UNICODE_GLYPHS;
-  const c = colorize(r.color);
+  const ctx: RenderCtx = { c: colorize(r.color), g: r.ascii ? ASCII_GLYPHS : UNICODE_GLYPHS, r };
   const lines: string[] = [];
 
   lines.push(
-    c.title('AgentForce PMD — Cyclomatic Complexity (McCabe)'),
-    g.ruleHeavy.repeat(r.width),
+    ctx.c.title('AgentForce PMD — Cyclomatic Complexity (McCabe)'),
+    ctx.g.ruleHeavy.repeat(r.width),
   );
 
   if (report.files.length === 0) {
@@ -73,101 +78,104 @@ export function renderText(report: AnalysisReport, opts?: RenderOptions): string
     return lines.join('\n');
   }
 
-  for (const f of report.files) {
-    lines.push(
-      '',
-      `${g.agentFile} ${c.path(f.path)}   CC=${c.cc(f.fileComplexity)}`,
-      g.ruleLight.repeat(r.width),
-    );
+  for (const f of report.files) renderFileRows(f, ctx, lines);
 
-    if (f.procedures.length === 0) {
-      lines.push('  (no procedure-bearing scopes)');
-    } else {
-      const scopes = groupByScope(f.procedures);
-      for (const [scope, procs] of scopes) {
-        const scopeTotal = procs.reduce((a, p) => a + p.complexity, 0);
-        lines.push(`  ${c.scope(scope)}   subtotal CC=${c.cc(scopeTotal)}`);
-        for (const p of procs) {
-          lines.push(
-            `    ${pad(KIND_LABEL[p.kind], 24)} CC=${c.cc(p.complexity)}   ` +
-              c.breakdown(breakdownProc(p)),
-          );
-        }
-      }
-    }
-
-    if (f.declarations.length > 0 || f.references.length > 0) {
-      lines.push(
-        '',
-        '  Action references',
-        '  ' + g.ruleLight.repeat(Math.max(0, r.width - 2)),
-      );
-      const usage = countReferences(f);
-      for (const d of f.declarations) {
-        const used = usage.get(d.name) ?? 0;
-        const tgt = d.target ?? '(no target)';
-        lines.push(
-          `    ${pad(d.name, 32)} [${pad(d.targetKind, 6)}] used ${used}x → ${tgt}`,
-        );
-      }
-
-      const undeclared = listUndeclaredRefs(f);
-      if (undeclared.length > 0) {
-        lines.push('', '    Referenced but not declared in-file:');
-        for (const u of undeclared) {
-          lines.push(`      ${u}`);
-        }
-      }
-    }
-  }
-
-  if (report.apexClasses.length > 0 || report.unresolvedApexTargets.length > 0) {
-    lines.push(
-      '',
-      c.title('Apex backing logic (resolved via apex:// targets)'),
-      g.ruleHeavy.repeat(r.width),
-    );
-    for (const cls of report.apexClasses) {
-      lines.push(
-        '',
-        `${g.apexFile} ${c.path(cls.path)}   class CC=${c.cc(cls.classComplexity)}`,
-        `   referenced by: ${cls.referencedBy.join(', ') || '(none)'}`,
-        g.ruleLight.repeat(r.width),
-      );
-      if (cls.methods.length === 0) {
-        lines.push('   (no methods with bodies)');
-      } else {
-        for (const m of cls.methods) {
-          lines.push(
-            `   ${pad(m.signature, 44)} CC=${c.cc(m.complexity)}   ${c.breakdown(breakdownApex(m.contributors))}`,
-          );
-        }
-      }
-    }
-
-    if (report.unresolvedApexTargets.length > 0) {
-      lines.push('', 'Unresolved apex:// targets:');
-      for (const u of report.unresolvedApexTargets) {
-        lines.push(
-          `  - ${u}  (no matching .cls under source-dir or --apex-source)`,
-        );
-      }
-    }
-  }
+  renderApexSection(report, ctx, lines);
 
   lines.push(
     '',
-    g.ruleHeavy.repeat(r.width),
-    c.title('CC by location (whitepaper § 7)'),
-    `  AgentScript: ${c.cc(report.totalComplexity)}` +
-      `   Apex: ${c.cc(report.totalApexComplexity)}` +
-      `   Combined: ${c.cc(report.totalComplexity + report.totalApexComplexity)}`,
+    ctx.g.ruleHeavy.repeat(r.width),
+    ctx.c.title('CC by location (whitepaper § 7)'),
+    `  AgentScript: ${ctx.c.cc(report.totalComplexity)}` +
+      `   Apex: ${ctx.c.cc(report.totalApexComplexity)}` +
+      `   Combined: ${ctx.c.cc(report.totalComplexity + report.totalApexComplexity)}`,
     `Action declarations: ${report.totalDeclarations}  ` +
       `(apex ${report.byTargetKind.apex}, flow ${report.byTargetKind.flow}, ` +
-      `prompt ${report.byTargetKind.prompt}, unknown ${report.byTargetKind.unknown})`, `Action references:   ${report.totalReferences}`
-  
+      `prompt ${report.byTargetKind.prompt}, unknown ${report.byTargetKind.unknown})`,
+    `Action references:   ${report.totalReferences}`,
   );
   return lines.join('\n');
+}
+
+function renderFileRows(f: FileReport, { c, g, r }: RenderCtx, lines: string[]): void {
+  lines.push(
+    '',
+    `${g.agentFile} ${c.path(f.path)}   CC=${c.cc(f.fileComplexity)}`,
+    g.ruleLight.repeat(r.width),
+  );
+
+  if (f.procedures.length === 0) {
+    lines.push('  (no procedure-bearing scopes)');
+  } else {
+    const scopes = groupByScope(f.procedures);
+    for (const [scope, procs] of scopes) {
+      const scopeTotal = procs.reduce((a, p) => a + p.complexity, 0);
+      lines.push(`  ${c.scope(scope)}   subtotal CC=${c.cc(scopeTotal)}`);
+      for (const p of procs) {
+        lines.push(
+          `    ${pad(KIND_LABEL[p.kind], 24)} CC=${c.cc(p.complexity)}   ` +
+            c.breakdown(breakdownProc(p)),
+        );
+      }
+    }
+  }
+
+  if (f.declarations.length > 0 || f.references.length > 0) {
+    lines.push(
+      '',
+      '  Action references',
+      '  ' + g.ruleLight.repeat(Math.max(0, r.width - 2)),
+    );
+    const usage = countReferences(f);
+    for (const d of f.declarations) {
+      const used = usage.get(d.name) ?? 0;
+      const tgt = d.target ?? '(no target)';
+      lines.push(
+        `    ${pad(d.name, 32)} [${pad(d.targetKind, 6)}] used ${used}x → ${tgt}`,
+      );
+    }
+
+    const undeclared = listUndeclaredRefs(f);
+    if (undeclared.length > 0) {
+      lines.push('', '    Referenced but not declared in-file:');
+      for (const u of undeclared) lines.push(`      ${u}`);
+    }
+  }
+}
+
+function renderApexSection(report: AnalysisReport, { c, g, r }: RenderCtx, lines: string[]): void {
+  if (report.apexClasses.length === 0 && report.unresolvedApexTargets.length === 0) return;
+
+  lines.push(
+    '',
+    c.title('Apex backing logic (resolved via apex:// targets)'),
+    g.ruleHeavy.repeat(r.width),
+  );
+
+  for (const cls of report.apexClasses) {
+    lines.push(
+      '',
+      `${g.apexFile} ${c.path(cls.path)}   class CC=${c.cc(cls.classComplexity)}`,
+      `   referenced by: ${cls.referencedBy.join(', ') || '(none)'}`,
+      g.ruleLight.repeat(r.width),
+    );
+    if (cls.methods.length === 0) {
+      lines.push('   (no methods with bodies)');
+    } else {
+      for (const m of cls.methods) {
+        lines.push(
+          `   ${pad(m.signature, 44)} CC=${c.cc(m.complexity)}   ${c.breakdown(breakdownApex(m.contributors))}`,
+        );
+      }
+    }
+  }
+
+  if (report.unresolvedApexTargets.length > 0) {
+    lines.push('', 'Unresolved apex:// targets:');
+    for (const u of report.unresolvedApexTargets) {
+      lines.push(`  - ${u}  (no matching .cls under source-dir or --apex-source)`);
+    }
+  }
 }
 
 interface Colorizer {

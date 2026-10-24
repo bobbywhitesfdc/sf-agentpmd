@@ -4,18 +4,18 @@ name: release and publish
 # matching vX.Y.Z release yet, build + test + publish to npm, then record a
 # GitHub Release. Everything runs in ONE job, so there is no cross-workflow
 # event chaining — which means the built-in GITHUB_TOKEN is sufficient and no
-# Personal Access Token is needed. Publishing uses the NPM_TOKEN automation
-# secret (which also bypasses npm 2FA).
+# Personal Access Token is needed. Publishing uses npm Trusted Publishing
+# (OIDC) — no NPM_TOKEN secret required.
 #
-# To release: bump `version` in package.json (and the pluginVersion() string
-# in src/renderers/sarif.ts), then push to main.
+# To release: bump `version` in package.json, then push to main.
 
 on:
   push:
     branches: [main]
 
 permissions:
-  contents: write # create the tag + GitHub Release with GITHUB_TOKEN
+  contents: write  # create the tag + GitHub Release with GITHUB_TOKEN
+  id-token: write  # npm Trusted Publishing (OIDC)
 
 jobs:
   release:
@@ -25,7 +25,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: latest
-          registry-url: 'https://registry.npmjs.org'
       - name: Is this version already released?
         id: check
         env:
@@ -47,9 +46,7 @@ jobs:
           npm test
       - name: Publish to npm
         if: steps.check.outputs.new == 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish
+        run: npm publish --provenance
       - name: Create GitHub Release
         if: steps.check.outputs.new == 'true'
         env:

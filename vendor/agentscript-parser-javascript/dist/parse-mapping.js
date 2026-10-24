@@ -18,7 +18,7 @@ import { CSTNode } from './cst-node.js';
 import { makeErrorNode, tokenToAutoLeaf } from './errors.js';
 import { makeEmptyError, makeMissing, synchronize, synchronizeRow, recoverToBlockEnd, parseOrphanBlock, skipNewlines, consumeCommentsAndSkipNewlines, isAtEnd, isTrailingCommentOnly, } from './recovery.js';
 import { parseExpression, wrapExpression, isKeyStart, isKeyTokenStart, isKeyTokenContinuation, parseKey, ATOM_TYPES, } from './expressions.js';
-import { isStatementStart, parseProcedure, parseSetStatement, parseTransitionStatement, parseWithStatement, parseAvailableWhenStatement, tryParseWithToStatementList, parseIfStatement, parseRunStatement, } from './parse-statements.js';
+import { isStatementStart, parseProcedure, parseSetStatement, parseSayStatement, parseTransitionStatement, parseCollectStatement, parseWithStatement, parseAvailableWhenStatement, parseWhenStatement, parseRenderStatement, parseShowAndReturnStatement, tryParseWithToStatementList, parseIfStatement, parseRunStatement, } from './parse-statements.js';
 import { parseTemplate, parseTemplateAsColinear } from './parse-templates.js';
 import invariant from 'tiny-invariant';
 /**
@@ -151,11 +151,39 @@ export function parseMappingItem(ctx, parseSequence) {
                 return parseRunStatement(ctx, c => parseTemplate(c));
             case 'set':
                 return parseSetStatement(ctx);
+            case 'say':
+                return parseSayStatement(ctx);
             case 'transition':
                 return parseTransitionStatement(ctx);
+            case 'ask': {
+                // "ask for" — two-word statement keyword (mirrors "available when").
+                if (ctx.peekAt(1).kind === TokenKind.ID &&
+                    ctx.peekAt(1).text === 'for') {
+                    return parseCollectStatement(ctx, c => parseTemplate(c));
+                }
+                break;
+            }
             case 'with': {
                 if (ctx.peekAt(1).kind !== TokenKind.COLON) {
                     return parseWithStatement(ctx);
+                }
+                break;
+            }
+            case 'when': {
+                if (ctx.peekAt(1).kind !== TokenKind.COLON) {
+                    return parseWhenStatement(ctx, c => parseTemplate(c));
+                }
+                break;
+            }
+            case 'render': {
+                if (ctx.peekAt(1).kind === TokenKind.COLON) {
+                    return parseRenderStatement(ctx, c => parseTemplate(c));
+                }
+                break;
+            }
+            case 'show_and_return': {
+                if (ctx.peekAt(1).kind === TokenKind.COLON) {
+                    return parseShowAndReturnStatement(ctx);
                 }
                 break;
             }
@@ -176,9 +204,9 @@ export function parseMappingItem(ctx, parseSequence) {
     if (tok.kind === TokenKind.COMMENT) {
         return ctx.consumeNamed('comment');
     }
-    // Standalone else/elif/for — wrap in ERROR with parsed body
+    // Standalone else/for — wrap in ERROR with parsed body
     if (tok.kind === TokenKind.ID &&
-        (tok.text === 'else' || tok.text === 'elif' || tok.text === 'for')) {
+        (tok.text === 'else' || tok.text === 'for')) {
         return parseOrphanBlock(ctx, c => parseProcedure(c, c2 => parseTemplate(c2)));
     }
     // Mapping element (key: value)
@@ -430,14 +458,19 @@ function parseColinearAndBlock(ctx, node, startRow, parseSequence) {
         ctx.peekKind() === TokenKind.INDENT &&
         ctx.peekAt(1).kind === TokenKind.ID &&
         ctx.peekAt(1).text === 'to') {
-        ctx.consumeKind(TokenKind.INDENT);
+        ctx.consume(); // INDENT
         const withToList = tryParseWithToStatementList(ctx);
         if (withToList) {
             colinear.value.appendChild(withToList, 'with_to_statement_list');
             node.endOffset = colinear.value.endOffset;
             node.endPosition = colinear.value.endPosition;
         }
-        ctx.consumeKind(TokenKind.DEDENT);
+        // Drain any leftover tokens (including deeper-nested indented blocks on
+        // malformed input) before the DEDENT so we never assume the next token is
+        // a DEDENT — matches parseIndentedBlockValue()'s recovery idiom.
+        recoverToBlockEnd(ctx, node);
+        if (ctx.peekKind() === TokenKind.DEDENT)
+            ctx.consume();
     }
     else if (ctx.peekKind() === TokenKind.INDENT) {
         parseIndentedBlockValue(ctx, node, parseSequence);

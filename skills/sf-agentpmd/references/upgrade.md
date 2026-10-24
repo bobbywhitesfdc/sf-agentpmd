@@ -41,7 +41,7 @@ npm run build
 sf plugins update                       # bumps every installed sf plugin
 # or, to target this one:
 sf plugins install sf-agentpmd@latest   # explicit
-sf plugins install sf-agentpmd@0.5.0    # pin to a specific version
+sf plugins install sf-agentpmd@1.0.0    # pin to a specific version
 ```
 
 `sf plugins update` is idempotent and safe to run at any time. It

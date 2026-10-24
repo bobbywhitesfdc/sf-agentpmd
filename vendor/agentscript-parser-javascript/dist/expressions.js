@@ -21,15 +21,16 @@
  */
 import { TokenKind } from './token.js';
 import { CSTNode } from './cst-node.js';
+import { skipVirtualTokens } from './recovery.js';
 // Hoisted constants — avoid per-call allocation
 // Must match ESCAPE_TABLE in @agentscript/language (packages/language/src/core/string-escapes.ts)
 const VALID_ESCAPES = new Set(['"', "'", '\\', 'n', 'r', 't', '0']);
 const KEY_STOP_KEYWORDS = new Set([
     'if',
-    'elif',
     'else',
     'run',
     'set',
+    'say',
     'with',
     'to',
     'transition',
@@ -95,6 +96,14 @@ function parsePrefix(ctx) {
         const op = tok.text;
         return parseUnary(ctx, op, 7);
     }
+    // DASH_SPACE ("- ") at expression position is unary minus, not a sequence
+    // marker. This only occurs inside bracketed expressions — at statement
+    // level, sequence-element dispatchers consume DASH_SPACE before calling
+    // parseExpression, so we're guaranteed to be in a `(…)` / `[…]` / `{…}`
+    // context where `- x` means "unary minus x".
+    if (tok.kind === TokenKind.DASH_SPACE) {
+        return parseUnary(ctx, '-', 7);
+    }
     // Spread *expr (precedence 7)
     if (tok.kind === TokenKind.STAR) {
         return parseSpread(ctx);
@@ -130,10 +139,27 @@ function parseSpread(ctx) {
     ctx.finishNode(node, startTok);
     return node;
 }
+function parseKeywordArgument(ctx) {
+    const startTok = ctx.peek();
+    const node = ctx.startNode('keyword_argument');
+    node.appendChild(ctx.consumeNamed('id'), 'name'); // keyword name
+    ctx.addAnonymousChild(node, ctx.consume()); // =
+    skipVirtualTokens(ctx);
+    const value = parseExpression(ctx, 0);
+    if (value) {
+        node.appendChild(wrapExpression(ctx, value), 'value');
+    }
+    else {
+        node.appendChild(makeEmptyError(ctx));
+    }
+    ctx.finishNode(node, startTok);
+    return node;
+}
 function parseParenthesized(ctx) {
     const startTok = ctx.peek();
     const node = ctx.startNode('parenthesized_expression');
     ctx.addAnonymousChild(node, ctx.consume()); // (
+    skipVirtualTokens(ctx);
     const expr = parseExpression(ctx, 0);
     if (expr) {
         node.appendChild(wrapExpression(ctx, expr), 'expression');
@@ -142,6 +168,7 @@ function parseParenthesized(ctx) {
         // Empty parens () → insert MISSING id
         node.appendChild(makeMissingArgument(ctx), 'expression');
     }
+    skipVirtualTokens(ctx);
     if (ctx.peekKind() === TokenKind.RPAREN) {
         ctx.addAnonymousChild(node, ctx.consume()); // )
     }
@@ -294,23 +321,12 @@ function parseList(ctx) {
     const startTok = ctx.peek();
     const node = ctx.startNode('list');
     ctx.addAnonymousChild(node, ctx.consume()); // [
-    // Lists can span multiple lines — skip whitespace tokens inside [...]
-    let _listIndentDepth = 0;
     while (ctx.peekKind() !== TokenKind.RBRACKET &&
         ctx.peekKind() !== TokenKind.EOF) {
-        if (ctx.peekKind() === TokenKind.NEWLINE) {
-            ctx.consume();
-            continue;
-        }
-        if (ctx.peekKind() === TokenKind.INDENT) {
-            _listIndentDepth++;
-            ctx.consume();
-            continue;
-        }
-        if (ctx.peekKind() === TokenKind.DEDENT) {
-            _listIndentDepth--;
-            ctx.consume();
-            continue;
+        skipVirtualTokens(ctx);
+        if (ctx.peekKind() === TokenKind.RBRACKET ||
+            ctx.peekKind() === TokenKind.EOF) {
+            break;
         }
         const expr = parseExpression(ctx, 0);
         if (expr) {
@@ -319,6 +335,7 @@ function parseList(ctx) {
         else {
             break;
         }
+        skipVirtualTokens(ctx);
         if (ctx.peekKind() === TokenKind.COMMA) {
             ctx.addAnonymousChild(node, ctx.consume());
         }
@@ -326,12 +343,7 @@ function parseList(ctx) {
             break;
         }
     }
-    // Skip whitespace tokens to find the closing ]
-    while (ctx.peekKind() === TokenKind.NEWLINE ||
-        ctx.peekKind() === TokenKind.INDENT ||
-        ctx.peekKind() === TokenKind.DEDENT) {
-        ctx.consume();
-    }
+    skipVirtualTokens(ctx);
     if (ctx.peekKind() === TokenKind.RBRACKET) {
         ctx.addAnonymousChild(node, ctx.consume());
     }
@@ -345,14 +357,12 @@ function parseDictionary(ctx) {
     const startTok = ctx.peek();
     const node = ctx.startNode('dictionary');
     ctx.addAnonymousChild(node, ctx.consume()); // {
-    // Dictionaries can span multiple lines
     while (ctx.peekKind() !== TokenKind.RBRACE &&
         ctx.peekKind() !== TokenKind.EOF) {
-        if (ctx.peekKind() === TokenKind.NEWLINE ||
-            ctx.peekKind() === TokenKind.INDENT ||
-            ctx.peekKind() === TokenKind.DEDENT) {
-            ctx.consume();
-            continue;
+        skipVirtualTokens(ctx);
+        if (ctx.peekKind() === TokenKind.RBRACE ||
+            ctx.peekKind() === TokenKind.EOF) {
+            break;
         }
         const pair = parseDictionaryPair(ctx);
         if (pair) {
@@ -361,6 +371,7 @@ function parseDictionary(ctx) {
         else {
             break;
         }
+        skipVirtualTokens(ctx);
         if (ctx.peekKind() === TokenKind.COMMA) {
             ctx.addAnonymousChild(node, ctx.consume());
         }
@@ -368,6 +379,7 @@ function parseDictionary(ctx) {
             break;
         }
     }
+    skipVirtualTokens(ctx);
     if (ctx.peekKind() === TokenKind.RBRACE) {
         ctx.addAnonymousChild(node, ctx.consume());
     }
@@ -453,16 +465,35 @@ function parseCall(ctx, func) {
     const node = ctx.startNodeAt('call_expression', func);
     node.appendChild(wrapExpression(ctx, func), 'function');
     ctx.addAnonymousChild(node, ctx.consume()); // (
-    while (ctx.peekKind() !== TokenKind.RPAREN && !ctx.isAtSyncPoint()) {
-        const arg = parseExpression(ctx, 0);
-        if (arg) {
-            node.appendChild(wrapExpression(ctx, arg), 'argument');
-        }
-        else {
+    // Inside `()`, the lexer emits NEWLINE/INDENT/DEDENT normally — we skip
+    // them at the parser level (mirrors parseList/parseDictionary).  Loop
+    // exits on RPAREN or EOF; NEWLINE/DEDENT aren't treated as sync points
+    // here because we're inside brackets.
+    while (ctx.peekKind() !== TokenKind.RPAREN &&
+        ctx.peekKind() !== TokenKind.EOF) {
+        skipVirtualTokens(ctx);
+        if (ctx.peekKind() === TokenKind.RPAREN ||
+            ctx.peekKind() === TokenKind.EOF) {
             break;
         }
+        // Parse `id=expr` as a keyword argument.
+        if (ctx.peekKind() === TokenKind.ID &&
+            ctx.peekAt(1).kind === TokenKind.EQ) {
+            node.appendChild(parseKeywordArgument(ctx), 'argument');
+        }
+        else {
+            const arg = parseExpression(ctx, 0);
+            if (arg) {
+                node.appendChild(wrapExpression(ctx, arg), 'argument');
+            }
+            else {
+                break;
+            }
+        }
+        skipVirtualTokens(ctx);
         if (ctx.peekKind() === TokenKind.COMMA) {
             ctx.addAnonymousChild(node, ctx.consume());
+            skipVirtualTokens(ctx);
             // Trailing comma: if `)` follows, insert MISSING id argument
             if (ctx.peekKind() === TokenKind.RPAREN) {
                 node.appendChild(makeMissingArgument(ctx), 'argument');
@@ -509,10 +540,21 @@ function parseSubscript(ctx, object) {
     const node = ctx.startNodeAt('subscript_expression', object);
     node.appendChild(wrapExpression(ctx, object));
     ctx.addAnonymousChild(node, ctx.consume()); // [
-    const index = parseExpression(ctx, 0);
-    if (index) {
-        node.appendChild(wrapExpression(ctx, index));
+    skipVirtualTokens(ctx);
+    // Parse the leading (start) bound unless a ':' opens the bracket directly —
+    // that's an open-start slice like `[:b]`, which has no start expression.
+    const startExpr = ctx.peekKind() === TokenKind.COLON ? null : parseExpression(ctx, 0);
+    skipVirtualTokens(ctx);
+    if (ctx.peekKind() === TokenKind.COLON) {
+        // Slice: `[ start? : stop? ( : step? )? ]`. The slice node is a direct,
+        // unwrapped child of the subscript (matching the tree-sitter grammar).
+        node.appendChild(parseSlice(ctx, startExpr));
     }
+    else if (startExpr) {
+        // Plain index: `[ expr ]`.
+        node.appendChild(wrapExpression(ctx, startExpr));
+    }
+    skipVirtualTokens(ctx);
     if (ctx.peekKind() === TokenKind.RBRACKET) {
         ctx.addAnonymousChild(node, ctx.consume());
     }
@@ -520,6 +562,59 @@ function parseSubscript(ctx, object) {
         node.appendChild(makeEmptyError(ctx));
     }
     ctx.finishNode(node, startTok);
+    return node;
+}
+/**
+ * Parse the slice body inside a subscript once a ':' has been detected:
+ * `start? : stop? ( : step? )?`. At least one of `start`, `stop`, or `step`
+ * must be present (open-bound forms like `[a:]`, `[:b]`, `[::c]` are
+ * accepted); a bare `[:]` — Python's shallow-copy — is rejected as it has no
+ * runtime meaning in AgentScript. `startExpr` is the already-parsed leading
+ * bound, or null for open-start forms. The colons are anonymous children;
+ * the bounds are attached under the `start`/`stop`/`step` field names so the
+ * emitted CST matches tree-sitter's `slice_expression`. The enclosing
+ * parseSubscript owns the surrounding `[`/`]`. Returns an ERROR node when
+ * no bound is present.
+ */
+function parseSlice(ctx, startExpr) {
+    const startTok = ctx.peek();
+    // Anchor on the start bound when present; otherwise on the ':' token, since
+    // startNodeAt needs an existing child to derive its span from.
+    const node = startExpr
+        ? ctx.startNodeAt('slice_expression', startExpr)
+        : ctx.startNode('slice_expression');
+    if (startExpr) {
+        node.appendChild(wrapExpression(ctx, startExpr), 'start');
+    }
+    ctx.addAnonymousChild(node, ctx.consume()); // first ':'
+    skipVirtualTokens(ctx);
+    // Optional stop bound. parseExpression consumes nothing and returns null
+    // when the next token is ':' or ']', so no explicit guard is needed.
+    const stopExpr = parseExpression(ctx, 0);
+    if (stopExpr) {
+        node.appendChild(wrapExpression(ctx, stopExpr), 'stop');
+    }
+    skipVirtualTokens(ctx);
+    // Optional step segment: a second ':' followed by an optional step bound.
+    let stepExpr = null;
+    if (ctx.peekKind() === TokenKind.COLON) {
+        ctx.addAnonymousChild(node, ctx.consume()); // second ':'
+        skipVirtualTokens(ctx);
+        stepExpr = parseExpression(ctx, 0);
+        if (stepExpr) {
+            node.appendChild(wrapExpression(ctx, stepExpr), 'step');
+        }
+        skipVirtualTokens(ctx);
+    }
+    ctx.finishNode(node, startTok);
+    // Reject `[:]` — no bounds at all. Wrap the empty slice in an ERROR so the
+    // subscript reports a syntax error instead of silently emitting a shallow
+    // copy at runtime.
+    if (!startExpr && !stopExpr && !stepExpr) {
+        const errNode = new CSTNode('ERROR', ctx.source, node.startOffset, node.endOffset, node.startPosition, node.endPosition);
+        errNode.appendChild(node);
+        return errNode;
+    }
     return node;
 }
 function parseTernary(ctx, consequence) {

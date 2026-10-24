@@ -1,9 +1,3 @@
-/**
- * CST-walk syntax highlighter for AgentScript.
- *
- * Produces QueryCapture[] matching the tree-sitter highlights.scm rules.
- * Replaces tree-sitter's Query engine with a direct CST walk.
- */
 import type { CSTNode } from './cst-node.js';
 export interface HighlightCapture {
     name: string;

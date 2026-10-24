@@ -7,4 +7,5 @@
 export { toRange } from './position.js';
 export { comment } from './comment.js';
 export { DiagnosticSeverity, DiagnosticTag } from './diagnostic.js';
+export { BUILTIN_FUNCTION_NAMES, BUILTIN_FUNCTION_NAME_SET, } from './functions.js';
 //# sourceMappingURL=index.js.map

@@ -3,7 +3,7 @@ name: sf-agentpmd
 description: Use this skill whenever working with the sf-agentpmd SF CLI plugin — discovering its commands, installing or upgrading it, running it against an Agentforce / AgentScript project, or interpreting its text / JSON / Markdown / SARIF / CSV outputs. Triggers on mentions of `sf agentpmd`, "AgentScript cyclomatic complexity", "Agent CC", "McCabe analysis of .agent files", "agent PMD", or any request to compute or report complexity / action-reference inventory for AgentScript bundles and the Apex backing logic they invoke.
 metadata:
   type: skill
-  version: "0.3.0"
+  version: "1.0.0"
   last_updated: "2026-07-18"
 ---
 

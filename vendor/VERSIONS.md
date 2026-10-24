@@ -6,10 +6,11 @@ and inlined into the published bundle by `esbuild.config.mjs`.
 
 | Package | Vendored version | Upstream path |
 | --- | --- | --- |
-| `@agentscript/parser-javascript` | `2.4.0` | `packages/parser-javascript` |
-| `@agentscript/types` | `0.2.1` | `packages/types` |
+| `@agentscript/parser-javascript` | `3.4.2` | `packages/parser-javascript` |
+| `@agentscript/types` | `0.6.0` | `packages/types` |
 
-**Last checked:** 2026-10-24
+
+**Last checked:** 2026-10-24 (upstream commit `ace15eb`)
 
 ## Checking for updates
 

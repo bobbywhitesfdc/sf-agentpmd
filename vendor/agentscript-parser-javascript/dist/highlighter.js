@@ -5,6 +5,13 @@
  * For full license text, see the LICENSE file in the repo root or https://www.apache.org/licenses/LICENSE-2.0
  */
 /**
+ * CST-walk syntax highlighter for AgentScript.
+ *
+ * Produces QueryCapture[] matching the tree-sitter highlights.scm rules.
+ * Replaces tree-sitter's Query engine with a direct CST walk.
+ */
+import { BUILTIN_FUNCTION_NAME_SET } from '@agentscript/types';
+/**
  * Walk the CST and produce highlight captures matching highlights.scm.
  *
  * Tree-sitter query priority: later patterns override earlier ones.
@@ -45,6 +52,7 @@ function walkNode(node, captures) {
             }
             return;
         case 'string_content':
+        case 'say_string_content':
             capture(node, 'string', captures);
             return;
         case 'escape_sequence':
@@ -63,7 +71,8 @@ function walkNode(node, captures) {
             captureAtId(node, captures);
             return;
         case 'template_expression':
-            captureTemplateExpression(node, captures);
+        case 'say_interpolation':
+            captureInterpolationDelimiters(node, captures);
             return;
         case 'variable_declaration':
             captureVariableDeclaration(node, captures);
@@ -78,6 +87,24 @@ function walkNode(node, captures) {
     for (const child of node.children) {
         walkNode(child, captures);
     }
+}
+/**
+ * True when `idNode` is the callee name of a direct call — i.e. it climbs
+ * `id → atom → expression` where that `expression` is the `function` field of a
+ * `call_expression`. Namespaced calls (`a2a.message(...)`) have a
+ * member_expression callee, not a bare atom, so they return false here.
+ */
+function isCallFunctionId(idNode) {
+    const atom = idNode.parent;
+    if (atom?.type !== 'atom')
+        return false;
+    const expression = atom.parent;
+    if (expression?.type !== 'expression')
+        return false;
+    const call = expression.parent;
+    if (call?.type !== 'call_expression')
+        return false;
+    return call.childForFieldName('function') === expression;
 }
 /** Check if a key node belongs to a root-level mapping element (source_file > mapping > mapping_element > key). */
 function isRootLevelKey(keyNode) {
@@ -118,6 +145,17 @@ function captureId(node, captures) {
         }
         return;
     }
+    // Function call name: `len(...)`, `json_path(...)`, `foo(...)`.
+    // The name climbs id → atom → expression → call_expression (function field).
+    // Namespaced calls (`a2a.message(...)`) have a member_expression function, so
+    // they fall through to the member-access branch below — matching highlights.scm.
+    if (isCallFunctionId(node)) {
+        const name = BUILTIN_FUNCTION_NAME_SET.has(node.text)
+            ? 'function.builtin'
+            : 'function';
+        capture(node, name, captures);
+        return;
+    }
     // Member expression: expr.id → variable (the property after dot)
     if (parent?.type === 'member_expression') {
         // Only the trailing id (not the expression part)
@@ -150,8 +188,8 @@ function captureAtId(node, captures) {
         }
     }
 }
-/** Capture template expression delimiters {! and }. */
-function captureTemplateExpression(node, captures) {
+/** Capture interpolation delimiters {! and }. */
+function captureInterpolationDelimiters(node, captures) {
     for (const child of node.children) {
         if (child.text === '{!') {
             capture(child, 'punctuation.template', captures);
@@ -182,14 +220,16 @@ function captureAnonymous(node, captures) {
     // Keywords
     switch (text) {
         case 'if':
-        case 'elif':
         case 'else':
         case 'run':
         case 'with':
         case 'set':
+        case 'say':
         case 'transition':
         case 'available':
         case 'when':
+        case 'ask':
+        case 'for':
         case 'and':
         case 'or':
         case 'not':

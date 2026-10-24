@@ -36,7 +36,7 @@ export function makeMissing(ctx, type) {
     return new CSTNode(type, ctx.source, offset, offset, pos, pos, true, false, true);
 }
 /**
- * Parse a standalone else/elif/for (without a preceding if, or unsupported).
+ * Parse a standalone else/for (without a preceding if, or unsupported).
  * Wraps the entire block in an ERROR node, preserving parsed statements inside.
  *
  * @param parseProcedure - callback to parse procedure bodies, avoiding circular
@@ -161,6 +161,26 @@ export function synchronize(ctx) {
 // --- Utility ---
 export function skipNewlines(ctx) {
     while (ctx.peekKind() === TokenKind.NEWLINE) {
+        ctx.consume();
+    }
+}
+/**
+ * Skip NEWLINE/INDENT/DEDENT tokens. Called by bracketed-expression parsers
+ * (parseCall, parseParenthesized, parseSubscript, parseList,
+ * parseDictionary) to consume virtual indent tokens that carry no syntactic
+ * meaning inside `(…)`, `[…]`, or `{…}`.
+ *
+ * Mirrors tree-sitter-python's approach, adapted to recursive descent:
+ * whereas the LR scanner reads `valid_symbols[CLOSE_*]` from the parser's
+ * item set to detect bracketed context, our recursive-descent parser knows
+ * it's inside brackets because it's on a call stack frame between the open
+ * and close. Either way, virtual tokens get skipped at the point of use
+ * rather than suppressed at the lexer.
+ */
+export function skipVirtualTokens(ctx) {
+    while (ctx.peekKind() === TokenKind.NEWLINE ||
+        ctx.peekKind() === TokenKind.INDENT ||
+        ctx.peekKind() === TokenKind.DEDENT) {
         ctx.consume();
     }
 }

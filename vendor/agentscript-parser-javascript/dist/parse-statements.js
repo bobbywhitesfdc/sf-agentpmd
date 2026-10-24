@@ -19,6 +19,8 @@ import { CSTNode } from './cst-node.js';
 import { makeErrorNode, tokenToAutoLeaf } from './errors.js';
 import { makeEmptyError, addMissingTarget, makeMissing, synchronize, synchronizeRow, synchronizeRowUntilColon, consumeCommentsAndSkipNewlines, skipNewlines, isAtEnd, isTrailingCommentOnly, parseOrphanBlock, } from './recovery.js';
 import { parseExpression, wrapExpression, parseString } from './expressions.js';
+import { parseMapping } from './parse-mapping.js';
+import { parseSequence } from './parse-sequence.js';
 // ---------------------------------------------------------------------------
 // Statement detection
 // ---------------------------------------------------------------------------
@@ -30,13 +32,26 @@ export function isStatementStart(ctx) {
         case 'if':
         case 'run':
         case 'set':
+        case 'say':
         case 'transition':
+        case 'escalate':
+        case 'end_session':
             return true;
         case 'with':
             // "with" is a statement only if not followed by colon (which would make it a key)
             return ctx.peekAt(1).kind !== TokenKind.COLON;
+        case 'when':
+            // "when" is a statement only if not followed by colon (which would make it a key)
+            return ctx.peekAt(1).kind !== TokenKind.COLON;
+        case 'render':
+        case 'show_and_return':
+            return ctx.peekAt(1).kind === TokenKind.COLON;
         case 'available':
             return (ctx.peekAt(1).kind === TokenKind.ID && ctx.peekAt(1).text === 'when');
+        case 'ask':
+            // "ask for" is a two-word statement keyword (mirrors "available when").
+            // A bare "ask" not followed by "for" is not a statement start.
+            return (ctx.peekAt(1).kind === TokenKind.ID && ctx.peekAt(1).text === 'for');
         default:
             return false;
     }
@@ -87,10 +102,38 @@ export function parseStatement(ctx, parseTemplate) {
                 return parseRunStatement(ctx, parseTemplate);
             case 'set':
                 return parseSetStatement(ctx);
+            case 'say':
+                return parseSayStatement(ctx);
             case 'transition':
                 return parseTransitionStatement(ctx);
+            case 'escalate':
+                return parseEscalateStatement(ctx);
+            case 'end_session':
+                return parseEndSessionStatement(ctx);
+            case 'ask':
+                // "ask for" — two-word statement keyword (mirrors "available when").
+                if (ctx.peekAt(1).kind === TokenKind.ID &&
+                    ctx.peekAt(1).text === 'for') {
+                    return parseCollectStatement(ctx, parseTemplate);
+                }
+                break;
             case 'with':
                 return parseWithStatement(ctx);
+            case 'when':
+                if (ctx.peekAt(1).kind !== TokenKind.COLON) {
+                    return parseWhenStatement(ctx, parseTemplate);
+                }
+                break;
+            case 'render':
+                if (ctx.peekAt(1).kind === TokenKind.COLON) {
+                    return parseRenderStatement(ctx, parseTemplate);
+                }
+                break;
+            case 'show_and_return':
+                if (ctx.peekAt(1).kind === TokenKind.COLON) {
+                    return parseShowAndReturnStatement(ctx);
+                }
+                break;
             case 'available': {
                 if (ctx.peekAt(1).kind === TokenKind.ID &&
                     ctx.peekAt(1).text === 'when') {
@@ -99,9 +142,8 @@ export function parseStatement(ctx, parseTemplate) {
                 break;
             }
             case 'else':
-            case 'elif':
             case 'for':
-                // Orphan else/elif (without if) or unsupported for → wrap in ERROR
+                // Orphan else (without preceding if) or unsupported for → wrap in ERROR
                 return parseOrphanBlock(ctx, c => parseProcedure(c, parseTemplate));
         }
     }
@@ -129,20 +171,29 @@ export function parseStatement(ctx, parseTemplate) {
 // Shared colon → procedure body
 // ---------------------------------------------------------------------------
 /**
- * Shared colon → procedure body sequence for if/elif/else.
+ * Shared colon → procedure body sequence for if / else if / else.
  * Consumes colon (with recovery), inline comment, extra inline tokens,
  * then INDENT → procedure → DEDENT, and trailing NEWLINE.
  *
- * @param errorOnMissingBody - if true, insert ERROR when colon has no
- *   indented body (used by `if`; elif/else silently accept missing body).
+ * A missing colon is always a syntax error — every one of `if`, `else if`
+ * and `else` requires it, matching the tree-sitter grammar (which lists `:`
+ * as a mandatory token in all three rules). Otherwise a colon-less `else`
+ * would parse as a valid `else_clause`, diverging from tree-sitter.
+ *
+ * @param errorOnMissingBody - if true, insert ERROR when the colon has no
+ *   indented body (used by `if`; else if / else silently accept a missing
+ *   body, e.g. while the author is still typing the block).
  */
 function parseColonAndProcedureBody(ctx, node, row, errorOnMissingBody, parseTemplate) {
-    // Colon (or recovery)
+    // Colon (or recovery) — required for if / else if / else alike.
+    // Insert a MISSING `:` node (not an empty ERROR) so the diagnostic reads
+    // "Missing :" and anchors to the end of the condition/keyword, matching
+    // tree-sitter (which lists `:` as a required token) and the mapping parser.
     if (ctx.peekKind() === TokenKind.COLON) {
         ctx.addAnonymousChild(node, ctx.consume());
     }
-    else if (errorOnMissingBody) {
-        node.appendChild(makeEmptyError(ctx));
+    else {
+        node.appendChild(makeMissing(ctx, ':'));
     }
     // Inline comment after colon
     if (ctx.peekKind() === TokenKind.COMMENT) {
@@ -209,14 +260,16 @@ export function parseIfStatement(ctx, parseTemplate) {
             node.appendChild(err);
     }
     parseColonAndProcedureBody(ctx, node, startTok.start.row, true, parseTemplate);
-    // elif clauses (including misspelled 'elseif')
+    // `else if` chain links — match `else` followed by `if` on the same row
     while (ctx.peekKind() === TokenKind.ID &&
-        (ctx.peek().text === 'elif' || ctx.peek().text === 'elseif')) {
-        const elif = parseElifClause(ctx, parseTemplate);
-        if (elif)
-            node.appendChild(elif, 'alternative');
+        ctx.peek().text === 'else' &&
+        ctx.peekAt(1).kind === TokenKind.ID &&
+        ctx.peekAt(1).text === 'if') {
+        const elseIf = parseElseIfClause(ctx, parseTemplate);
+        if (elseIf)
+            node.appendChild(elseIf, 'alternative');
     }
-    // else clause
+    // Plain `else` clause
     if (ctx.peekKind() === TokenKind.ID && ctx.peek().text === 'else') {
         const elseClause = parseElseClause(ctx, parseTemplate);
         if (elseClause)
@@ -225,20 +278,13 @@ export function parseIfStatement(ctx, parseTemplate) {
     ctx.finishNode(node, startTok);
     return node;
 }
-function parseElifClause(ctx, parseTemplate) {
+function parseElseIfClause(ctx, parseTemplate) {
     const startTok = ctx.peek();
-    const node = ctx.startNode('elif_clause');
-    const kw = ctx.consume(); // elif or elseif
-    if (kw.text === 'elseif') {
-        // Wrap misspelled keyword in ERROR
-        const kwEnd = kw.startOffset + kw.text.length;
-        const leaf = tokenToAutoLeaf(kw, ctx.source, kw.startOffset);
-        const errNode = makeErrorNode(ctx.source, [leaf], kw.startOffset, kwEnd, kw.start, kw.end);
-        node.appendChild(errNode);
-    }
-    else {
-        ctx.addAnonymousChild(node, kw);
-    }
+    const node = ctx.startNode('else_if_clause');
+    // `else` keyword
+    ctx.addAnonymousChild(node, ctx.consume());
+    // `if` keyword
+    ctx.addAnonymousChild(node, ctx.consume());
     const condition = parseExpression(ctx, 0);
     if (condition)
         node.appendChild(wrapExpression(ctx, condition), 'condition');
@@ -311,6 +357,73 @@ export function parseRunStatement(ctx, parseTemplate) {
     ctx.finishNode(node, startTok);
     return node;
 }
+/**
+ * Parse `ask for @variables.X <INDENT> instructions: "..." <DEDENT>`.
+ *
+ * Produces a `collect_statement` node with a `target` field (the variable
+ * expression) and a `body` field holding a `mapping` (with the `instructions:`
+ * element). Mirrors the tree-sitter grammar's collect_statement rule: `ask for`
+ * is a two-word operator (like `available when`), so there is no colon after the
+ * target. (The CST node retains its internal `collect_statement` name.)
+ */
+export function parseCollectStatement(ctx, _parseTemplate) {
+    const startTok = ctx.peek();
+    const node = ctx.startNode('collect_statement');
+    ctx.addAnonymousChild(node, ctx.consume()); // ask
+    ctx.addAnonymousChild(node, ctx.consume()); // for
+    // Target expression (e.g. @variables.patient_city)
+    // Builder temporarily inserts `@...` while the user is choosing a
+    // reference. Recover like tree-sitter: diagnose the `@`, use `...` as the
+    // placeholder target, and keep the indented collect body attached. If the
+    // ellipsis is left unconsumed, its INDENT/DEDENT pair can terminate the
+    // surrounding mapping early and make later blocks appear invalid.
+    if (ctx.peekKind() === TokenKind.AT &&
+        ctx.peekAt(1).kind === TokenKind.ELLIPSIS) {
+        const atToken = ctx.consume();
+        const atLeaf = tokenToAutoLeaf(atToken, ctx.source, atToken.startOffset);
+        node.appendChild(makeErrorNode(ctx.source, [atLeaf], atToken.startOffset, atToken.startOffset + atToken.text.length, atToken.start, atToken.end));
+        const target = parseExpression(ctx, 0);
+        if (target) {
+            node.appendChild(wrapExpression(ctx, target), 'target');
+        }
+    }
+    else if (!ctx.isAtSyncPoint()) {
+        const target = parseExpression(ctx, 0);
+        if (target) {
+            node.appendChild(wrapExpression(ctx, target), 'target');
+        }
+        else {
+            addMissingTarget(ctx, node);
+        }
+    }
+    else {
+        addMissingTarget(ctx, node);
+    }
+    // Inline comment after the target (before the indented body). `ask for` is
+    // an operator like `available when`, so there is no colon between the target
+    // and body.
+    if (ctx.peekKind() === TokenKind.COMMENT) {
+        node.appendChild(ctx.consumeNamed('comment'));
+    }
+    // Indented body mapping (holds `message:`)
+    if (ctx.peekKind() === TokenKind.INDENT) {
+        ctx.consume();
+        consumeCommentsAndSkipNewlines(ctx, node);
+        const body = parseMapping(ctx, parseSequence);
+        if (body)
+            node.appendChild(body, 'body');
+        consumeCommentsAndSkipNewlines(ctx, node);
+        if (ctx.peekKind() === TokenKind.DEDENT)
+            ctx.consume();
+    }
+    else {
+        node.appendChild(makeEmptyError(ctx));
+    }
+    if (ctx.peekKind() === TokenKind.NEWLINE)
+        ctx.consume();
+    ctx.finishNode(node, startTok);
+    return node;
+}
 export function parseSetStatement(ctx) {
     const startTok = ctx.peek();
     const node = ctx.startNode('set_statement');
@@ -350,6 +463,150 @@ export function parseSetStatement(ctx) {
     ctx.finishNode(node, startTok);
     return node;
 }
+/** Parse a workflow `say "..."` directive with direct reference interpolation. */
+export function parseSayStatement(ctx) {
+    const startTok = ctx.peek();
+    const node = ctx.startNode('say_statement');
+    ctx.addAnonymousChild(node, ctx.consume()); // say
+    if (ctx.peekKind() === TokenKind.STRING && ctx.peek().text.startsWith('"')) {
+        node.appendChild(parseSayString(ctx), 'value');
+    }
+    else if (!ctx.isAtSyncPoint()) {
+        const token = ctx.consume();
+        const leaf = tokenToAutoLeaf(token, ctx.source, token.startOffset);
+        node.appendChild(makeErrorNode(ctx.source, [leaf], token.startOffset, token.startOffset + token.text.length, token.start, token.end));
+        const trailing = synchronizeRow(ctx, startTok.start.row);
+        if (trailing)
+            node.appendChild(trailing);
+    }
+    else {
+        node.appendChild(makeEmptyError(ctx));
+    }
+    if (ctx.peekKind() === TokenKind.NEWLINE)
+        ctx.consume();
+    ctx.finishNode(node, startTok);
+    return node;
+}
+/** Split the lexer's whole-string token into a say-specific CST. */
+function parseSayString(ctx) {
+    const token = ctx.peek();
+    const node = ctx.startNode('say_string');
+    const text = token.text;
+    const tokenOffset = token.startOffset;
+    const row = token.start.row;
+    const column = token.start.column;
+    ctx.consume();
+    const positions = [];
+    let currentRow = row;
+    let currentColumn = column;
+    for (let index = 0; index < text.length; index++) {
+        positions.push({ row: currentRow, column: currentColumn });
+        if (text.charCodeAt(index) === 10) {
+            currentRow++;
+            currentColumn = 0;
+        }
+        else {
+            currentColumn++;
+        }
+    }
+    positions.push({ row: currentRow, column: currentColumn });
+    const position = (index) => positions[index];
+    const appendLeaf = (type, start, end, isNamed = true, parent = node, fieldName) => {
+        parent.appendChild(new CSTNode(type, ctx.source, tokenOffset + start, tokenOffset + end, position(start), position(end), isNamed), fieldName);
+    };
+    appendLeaf('"', 0, 1, false);
+    const hasClosingQuote = hasUnescapedClosingQuote(text);
+    const contentEnd = hasClosingQuote ? text.length - 1 : text.length;
+    let index = 1;
+    let contentStart = index;
+    const flushContent = (end) => {
+        if (end <= contentStart)
+            return;
+        appendLeaf('say_string_content', contentStart, end);
+    };
+    while (index < contentEnd) {
+        if (text[index] === '\\' && index + 1 < contentEnd) {
+            flushContent(index);
+            const escapeEnd = index + 2;
+            const validEscape = /["'\\nrt0]/.test(text[index + 1]);
+            if (validEscape) {
+                appendLeaf('escape_sequence', index, escapeEnd);
+            }
+            else {
+                node.appendChild(new CSTNode('ERROR', ctx.source, tokenOffset + index, tokenOffset + escapeEnd, position(index), position(escapeEnd), true, true));
+            }
+            index = escapeEnd;
+            contentStart = index;
+            continue;
+        }
+        if (text[index] === '{' && text[index + 1] === '!') {
+            flushContent(index);
+            const close = text.indexOf('}', index + 2);
+            if (close === -1 || close >= contentEnd) {
+                node.appendChild(new CSTNode('ERROR', ctx.source, tokenOffset + index, tokenOffset + contentEnd, position(index), position(contentEnd), true, true));
+                index = contentEnd;
+                contentStart = index;
+                break;
+            }
+            const inner = text.slice(index + 2, close);
+            const match = inner.match(/^\s*@([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*$/);
+            if (!match) {
+                node.appendChild(new CSTNode('ERROR', ctx.source, tokenOffset + index, tokenOffset + close + 1, position(index), position(close + 1), true, true));
+            }
+            else {
+                const interpolation = new CSTNode('say_interpolation', ctx.source, tokenOffset + index, tokenOffset + close + 1, position(index), position(close + 1));
+                appendLeaf('{!', index, index + 2, false, interpolation);
+                const atIndex = index + 2 + inner.indexOf('@');
+                const namespace = match[1];
+                const property = match[2];
+                const namespaceNode = new CSTNode('at_id', ctx.source, tokenOffset + atIndex, tokenOffset + atIndex + namespace.length + 1, position(atIndex), position(atIndex + namespace.length + 1));
+                appendLeaf('@', atIndex, atIndex + 1, false, namespaceNode);
+                appendLeaf('id', atIndex + 1, atIndex + namespace.length + 1, true, namespaceNode);
+                const dotIndex = text.indexOf('.', atIndex + namespace.length + 1);
+                const propertyIndex = text.indexOf(property, dotIndex + 1);
+                const reference = new CSTNode('say_reference', ctx.source, tokenOffset + atIndex, tokenOffset + propertyIndex + property.length, position(atIndex), position(propertyIndex + property.length));
+                reference.appendChild(namespaceNode, 'namespace');
+                appendLeaf('.', dotIndex, dotIndex + 1, false, reference);
+                appendLeaf('id', propertyIndex, propertyIndex + property.length, true, reference, 'property');
+                interpolation.appendChild(reference, 'reference');
+                appendLeaf('}', close, close + 1, false, interpolation);
+                node.appendChild(interpolation);
+            }
+            index = close + 1;
+            contentStart = index;
+            continue;
+        }
+        // Match tree-sitter's token boundary: a lone `{` is one text part,
+        // while `{!` remains reserved for interpolation.
+        if (text[index] === '{') {
+            flushContent(index);
+            appendLeaf('say_string_content', index, index + 1);
+            index += 1;
+            contentStart = index;
+            continue;
+        }
+        index += 1;
+    }
+    flushContent(index);
+    if (hasClosingQuote) {
+        appendLeaf('"', text.length - 1, text.length, false);
+    }
+    else {
+        const missingPosition = position(text.length);
+        node.appendChild(new CSTNode('"', ctx.source, tokenOffset + text.length, tokenOffset + text.length, missingPosition, missingPosition, false, false, true));
+    }
+    ctx.finishNode(node, token);
+    return node;
+}
+function hasUnescapedClosingQuote(text) {
+    if (text.length <= 1 || !text.endsWith('"'))
+        return false;
+    let precedingBackslashes = 0;
+    for (let index = text.length - 2; index >= 0 && text[index] === '\\'; index--) {
+        precedingBackslashes++;
+    }
+    return precedingBackslashes % 2 === 0;
+}
 export function parseTransitionStatement(ctx) {
     const startTok = ctx.peek();
     const node = ctx.startNode('transition_statement');
@@ -377,6 +634,24 @@ export function parseTransitionStatement(ctx) {
         listNode.finalize();
         node.appendChild(listNode, 'with_to_statement_list');
     }
+    if (ctx.peekKind() === TokenKind.NEWLINE)
+        ctx.consume();
+    ctx.finishNode(node, startTok);
+    return node;
+}
+export function parseEscalateStatement(ctx) {
+    const startTok = ctx.peek();
+    const node = ctx.startNode('escalate_statement');
+    ctx.addAnonymousChild(node, ctx.consume()); // escalate
+    if (ctx.peekKind() === TokenKind.NEWLINE)
+        ctx.consume();
+    ctx.finishNode(node, startTok);
+    return node;
+}
+export function parseEndSessionStatement(ctx) {
+    const startTok = ctx.peek();
+    const node = ctx.startNode('end_session_statement');
+    ctx.addAnonymousChild(node, ctx.consume()); // end_session
     if (ctx.peekKind() === TokenKind.NEWLINE)
         ctx.consume();
     ctx.finishNode(node, startTok);
@@ -446,6 +721,71 @@ function parseWithParams(ctx, node) {
             break;
         }
     }
+}
+export function parseWhenStatement(ctx, parseTemplate) {
+    const startTok = ctx.peek();
+    const node = ctx.startNode('when_statement');
+    ctx.addAnonymousChild(node, ctx.consume()); // when
+    const subject = parseExpression(ctx, 0);
+    if (subject) {
+        node.appendChild(wrapExpression(ctx, subject), 'subject');
+    }
+    // Optional indented body (procedure)
+    if (ctx.peekKind() === TokenKind.INDENT) {
+        ctx.consume();
+        consumeCommentsAndSkipNewlines(ctx, node);
+        const proc = parseProcedure(ctx, parseTemplate);
+        if (proc)
+            node.appendChild(proc, 'body');
+        consumeCommentsAndSkipNewlines(ctx, node);
+        if (ctx.peekKind() === TokenKind.DEDENT)
+            ctx.consume();
+    }
+    if (ctx.peekKind() === TokenKind.NEWLINE)
+        ctx.consume();
+    ctx.finishNode(node, startTok);
+    return node;
+}
+export function parseRenderStatement(ctx, parseTemplate) {
+    const startTok = ctx.peek();
+    const node = ctx.startNode('render_statement');
+    ctx.addAnonymousChild(node, ctx.consume()); // render
+    if (ctx.peekKind() === TokenKind.COLON) {
+        ctx.addAnonymousChild(node, ctx.consume());
+    }
+    const value = parseExpression(ctx, 0);
+    if (value)
+        node.appendChild(wrapExpression(ctx, value), 'value');
+    // Optional indented body (procedure) — holds nested `show_and_return:` clause.
+    if (ctx.peekKind() === TokenKind.INDENT) {
+        ctx.consume();
+        consumeCommentsAndSkipNewlines(ctx, node);
+        const proc = parseProcedure(ctx, parseTemplate);
+        if (proc)
+            node.appendChild(proc, 'body');
+        consumeCommentsAndSkipNewlines(ctx, node);
+        if (ctx.peekKind() === TokenKind.DEDENT)
+            ctx.consume();
+    }
+    if (ctx.peekKind() === TokenKind.NEWLINE)
+        ctx.consume();
+    ctx.finishNode(node, startTok);
+    return node;
+}
+export function parseShowAndReturnStatement(ctx) {
+    const startTok = ctx.peek();
+    const node = ctx.startNode('show_and_return_statement');
+    ctx.addAnonymousChild(node, ctx.consume()); // show_and_return
+    if (ctx.peekKind() === TokenKind.COLON) {
+        ctx.addAnonymousChild(node, ctx.consume());
+    }
+    const value = parseExpression(ctx, 0);
+    if (value)
+        node.appendChild(wrapExpression(ctx, value), 'value');
+    if (ctx.peekKind() === TokenKind.NEWLINE)
+        ctx.consume();
+    ctx.finishNode(node, startTok);
+    return node;
 }
 export function parseAvailableWhenStatement(ctx) {
     const startTok = ctx.peek();

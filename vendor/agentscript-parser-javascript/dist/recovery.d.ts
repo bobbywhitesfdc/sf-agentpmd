@@ -14,7 +14,7 @@ export declare function addMissingTarget(ctx: ParserContext, node: CSTNode): voi
 /** Create a MISSING node — an expected token/node that wasn't found in source. */
 export declare function makeMissing(ctx: ParserContext, type: string): CSTNode;
 /**
- * Parse a standalone else/elif/for (without a preceding if, or unsupported).
+ * Parse a standalone else/for (without a preceding if, or unsupported).
  * Wraps the entire block in an ERROR node, preserving parsed statements inside.
  *
  * @param parseProcedure - callback to parse procedure bodies, avoiding circular
@@ -43,6 +43,20 @@ export declare function synchronizeRow(ctx: ParserContext, row: number): CSTNode
 /** Skip tokens until the next sync point (NEWLINE/DEDENT/EOF). */
 export declare function synchronize(ctx: ParserContext): CSTNode | null;
 export declare function skipNewlines(ctx: ParserContext): void;
+/**
+ * Skip NEWLINE/INDENT/DEDENT tokens. Called by bracketed-expression parsers
+ * (parseCall, parseParenthesized, parseSubscript, parseList,
+ * parseDictionary) to consume virtual indent tokens that carry no syntactic
+ * meaning inside `(…)`, `[…]`, or `{…}`.
+ *
+ * Mirrors tree-sitter-python's approach, adapted to recursive descent:
+ * whereas the LR scanner reads `valid_symbols[CLOSE_*]` from the parser's
+ * item set to detect bracketed context, our recursive-descent parser knows
+ * it's inside brackets because it's on a call stack frame between the open
+ * and close. Either way, virtual tokens get skipped at the point of use
+ * rather than suppressed at the lexer.
+ */
+export declare function skipVirtualTokens(ctx: ParserContext): void;
 /** Consume comment and newline tokens and attach to parent node. */
 export declare function consumeCommentsAndSkipNewlines(ctx: ParserContext, parent: CSTNode): void;
 export declare function isAtEnd(ctx: ParserContext): boolean;

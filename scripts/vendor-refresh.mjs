@@ -84,6 +84,12 @@ for (const pkg of UPSTREAM_PACKAGES) {
   const oldVersion = readVersion(vendorPkg) ?? '(none)'
 
   await copyDir(upstreamDist, join(vendorDir, 'dist'))
+
+  // Bump version in vendor package.json so vendor:check stays accurate.
+  const vendorPkgJson = JSON.parse(await readFile(vendorPkg, 'utf8'))
+  vendorPkgJson.version = newVersion
+  await writeFile(vendorPkg, JSON.stringify(vendorPkgJson, null, 2) + '\n')
+
   console.log(`  ✓  ${pkg.name}: ${oldVersion} → ${newVersion}`)
   rows.push(`| \`${pkg.name}\` | \`${newVersion}\` | \`${pkg.upstreamPath}\` |`)
 }

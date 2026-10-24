@@ -13,8 +13,6 @@ export declare class Lexer {
     /** Nested brace depth inside a template expression (for `{` inside `{!...}`). -1 means not inside a template expression. */
     private templateExprBraceDepth;
     private get inTemplateExpr();
-    /** Parenthesis depth — suppresses INDENT/DEDENT/NEWLINE when > 0 to support multi-line call expressions. */
-    private bracketDepth;
     constructor(source: string);
     tokenize(): Token[];
     private tokenizeLine;
@@ -25,6 +23,20 @@ export declare class Lexer {
     private tryDatetime;
     private tokenizeString;
     private tokenizeComment;
+    /**
+     * Consume template content as a single TEMPLATE_CONTENT token — the
+     * Python-tokenizer-style atomic-text pattern, mirroring scanner.c's
+     * TEMPLATE_CONTENT handler. Breaks at `{!` (opens a template expression)
+     * or end of line. Returns true when the caller's line is done (newline
+     * consumed or EOF); false to loop back through tokenizeLine's inner loop
+     * (we just emitted a TEMPLATE_EXPR_START and need to switch to code mode).
+     *
+     * Parens, braces, hashes, and quotes inside template text never reach
+     * tokenizeToken(), so they can't accidentally open strings or start
+     * comments.
+     */
+    private tokenizeTemplateContent;
+    private flushTemplateContent;
     private consumeIndentation;
     /**
      * Scan ahead (without advancing) past comment/blank lines to find the indent

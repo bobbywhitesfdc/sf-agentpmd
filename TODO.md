@@ -20,10 +20,14 @@ Releases are automated via GitHub Actions:
 - `.github/workflows/deprecate.yml` — manual `workflow_dispatch` to
   deprecate/un-deprecate a version via `NPM_TOKEN` (no local 2FA).
 
-**To cut a release:** bump `version` in `package.json` AND the
-`pluginVersion()` string in `src/renderers/sarif.ts`, then push to `main`.
+**To cut a release:** bump `version` in `package.json`, then push to `main`.
 That's it — the release workflow publishes and tags. Pushing to `main`
 without a version bump is a safe no-op (the version-check skips).
+`pluginVersion()` in the SARIF renderer is now injected at build time from
+`package.json` — no manual string to update.
+
+Before pushing, run `npm run vendor:check` to confirm the vendored
+AgentScript parser is current (see Vendored AgentScript section below).
 
 Only repo secret required: `NPM_TOKEN`. (Publishing through the GitHub
 Release UI is intentionally NOT wired up — publish is tied to the push, not
@@ -31,7 +35,7 @@ a release event.)
 
 ---
 
-## Vendored AgentScript — upstream sync (revisit next iteration)
+## Vendored AgentScript — upstream sync
 
 The upstream `@agentscript/*` packages are **not published to npm**, so we
 vendor them under `vendor/` as `file:` **devDependencies** and **inline**
@@ -41,27 +45,26 @@ them into the published bundle with esbuild (`esbuild.config.mjs`). Shipping
 multi-package install) — do **not** reintroduce a `file:` entry into
 runtime `dependencies`.
 
-Currently pinned (copied from `~/projects/agentscript` `dist/`):
-- `@agentscript/types@0.2.1` → `vendor/agentscript-types/`
-- `@agentscript/parser-javascript@2.4.0` → `vendor/agentscript-parser-javascript/`
+Current pins are recorded in `vendor/VERSIONS.md`. The release gate is:
 
-**The drift risk:** we vendor compiled `dist/`, not source, with no
-automatic link to upstream. If AgentScript's parser/types evolve, our copy
-silently falls behind. Before the next feature iteration:
+```
+npm run vendor:check   # warns if upstream (~/projects/agentscript) has a newer version
+npm run vendor:refresh # copies upstream dist/ → vendor/ and updates VERSIONS.md
+```
 
-- [ ] **Check upstream for changes.** `git -C ~/projects/agentscript pull`
-      and diff the `packages/types` + `packages/parser-javascript` versions
-      against the pins above. Note any grammar/AST changes that affect CC
-      counting.
-- [ ] **Design a refresh procedure that won't fall behind.** Options to
-      evaluate: (a) a `scripts/vendor-refresh.mjs` that copies upstream
-      `dist/` + records the source commit SHA in a `vendor/VERSIONS.md`;
-      (b) consume upstream as a git dependency / git submodule pinned to a
-      SHA instead of a hand-copied `dist/`; (c) ask upstream to publish to
-      npm (then drop vendoring + bundling entirely — simplest end state).
-      Whatever we pick, capture the upstream **commit SHA** so drift is
-      detectable, and keep the esbuild inlining so no `file:` dep ever
-      ships.
+`prepack` runs `vendor:check` automatically before every publish. The check
+is advisory (exit 0) — it cannot hard-fail CI because the upstream is a
+local checkout. **The human step is required before pushing to main:**
+
+1. `git clone https://github.com/salesforce/agentscript ~/projects/agentscript` (first time only)
+2. `git -C ~/projects/agentscript pull`
+3. `npm run vendor:check`
+4. If stale: `npm -C ~/projects/agentscript install && npm -C ~/projects/agentscript run build && npm run vendor:refresh`
+5. Commit updated vendor + VERSIONS.md, then push to main.
+
+Long-term option: ask upstream (`github.com/salesforce/agentscript`) to publish
+to npm. That would drop the vendoring and bundling complexity entirely — keep
+the esbuild inlining until then so no `file:` dep ever ships.
 
 ## Roadmap — deferred features
 

@@ -43,9 +43,11 @@
     "clean": "shx rm -rf dist oclif.manifest.json tsconfig.tsbuildinfo",
     "lint": "eslint",
     "posttest": "npm run lint",
-    "prepack": "oclif manifest && oclif readme",
+    "prepack": "npm run vendor:check && oclif manifest && oclif readme",
     "postpack": "shx rm -f oclif.manifest.json",
     "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "vendor:check": "node scripts/vendor-check.mjs",
+    "vendor:refresh": "node scripts/vendor-refresh.mjs",
     "version": "git add README.md"
   },
   "dependencies": {
